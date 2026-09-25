@@ -32,6 +32,10 @@ class TypeSafeBackend:
         self._Choice, self._Noul, self._Score = Choice, Noul, Score
         self.client = TypeSafeClient()
 
+    def noul(self, state: str, instructions: str) -> float:
+        resp = self.client.system_one(state=state, questions={"gate": self._Noul(instructions=instructions)})
+        return float(resp.answers["gate"].noul)
+
     def classify(self, state: str) -> Classification:
         qs = question_set()
         sdk_qs = {}
@@ -53,8 +57,55 @@ class TypeSafeBackend:
                 probs = {k: float(v) for k, v in getattr(ans, "probabilities", {}).items()}
                 out.choices[name] = {"choice": ans.choice, "probabilities": probs, "confidence": conf}
             else:
-                out.scores[name] = {"score": float(ans.score), "confidence": conf}
+                out.scores[name] = {"score": float(ans.score) + 1.0, "confidence": conf}  # 0-based -> 1..N
         return out
+
+
+class JevOpenRouterBackend:
+    """Real JEV via OpenRouter's Decisions API (alpha)."""
+
+    name = "jev-openrouter"
+    ENDPOINT = "https://openrouter.ai/api/alpha/decisions"
+
+    def __init__(self):
+        self.key = os.environ["OPENROUTER_API_KEY"]
+        self.model = os.getenv("JEV_MODEL", "typesafe/jev-1.13")
+        self.http = httpx.Client(timeout=60)
+
+    def _decide(self, state: str, questions: dict) -> dict:
+        r = self.http.post(
+            self.ENDPOINT,
+            headers={"Authorization": f"Bearer {self.key}"},
+            json={"model": self.model, "state": state, "questions": questions},
+        )
+        r.raise_for_status()
+        return r.json()
+
+    def classify(self, state: str) -> Classification:
+        qs = question_set()
+        answers = self._decide(state, qs)["answers"]
+        out = Classification(backend=self.name)
+        for name, q in qs.items():
+            a = answers[name]
+            if q["type"] == "noul":
+                out.nouls[name] = float(a["noul"])
+            elif q["type"] == "choice":
+                out.choices[name] = {
+                    "choice": a["choice"],
+                    "probabilities": a.get("probabilities", {}),
+                    "confidence": float(a.get("confidence", 1.0)),
+                }
+            else:
+                # JEV score is a 0-based index over criteria; normalize to 1..N
+                out.scores[name] = {
+                    "score": float(a["score"]) + 1.0,
+                    "confidence": float(a.get("confidence", 1.0)),
+                }
+        return out
+
+    def noul(self, state: str, instructions: str) -> float:
+        answers = self._decide(state, {"gate": {"type": "noul", "instructions": instructions}})["answers"]
+        return float(answers["gate"]["noul"])
 
 
 class OpenRouterBackend:
@@ -99,21 +150,30 @@ class OpenRouterBackend:
 
 
 def get_classifier():
-    if os.getenv("TYPESAFE_API_KEY"):
+    """Backend selection: SYSTEM1_BACKEND=auto|typesafe|jev-openrouter|emulated.
+
+    auto: TypeSafe direct (if TYPESAFE_API_KEY + sdk) -> real JEV via OpenRouter
+    (if OPENROUTER_API_KEY). 'emulated' opts into the chat-LLM approximation.
+    """
+    backend = os.getenv("SYSTEM1_BACKEND", "auto")
+    if backend in ("auto", "typesafe") and os.getenv("TYPESAFE_API_KEY"):
         try:
             return TypeSafeBackend()
         except ImportError:
-            print("[jev] TYPESAFE_API_KEY set but typesafe-sdk not installed; falling back to OpenRouter")
-    if os.getenv("OPENROUTER_API_KEY"):
+            if backend == "typesafe":
+                raise SystemExit("pip install typesafe-sdk for SYSTEM1_BACKEND=typesafe")
+            print("[jev] typesafe-sdk not installed; trying JEV via OpenRouter")
+    if backend in ("auto", "jev-openrouter") and os.getenv("OPENROUTER_API_KEY"):
+        return JevOpenRouterBackend()
+    if backend == "emulated" and os.getenv("OPENROUTER_API_KEY"):
         return OpenRouterBackend()
-    raise SystemExit("Set TYPESAFE_API_KEY (with typesafe-sdk) or OPENROUTER_API_KEY in .env")
+    raise SystemExit("Set OPENROUTER_API_KEY (JEV via OpenRouter) or TYPESAFE_API_KEY in .env")
 
 
 def noul_gate(classifier, state: str, instructions: str) -> float:
     """Single yes/no question — used for the SOAR action guardrail (Auto Mode pattern)."""
-    if isinstance(classifier, TypeSafeBackend):
-        resp = classifier.client.system_one(state=state, questions={"gate": classifier._Noul(instructions=instructions)})
-        return float(resp.answers["gate"].noul)
+    if hasattr(classifier, "noul"):
+        return classifier.noul(state, instructions)
     r = classifier.http.post(
         "https://openrouter.ai/api/v1/chat/completions",
         headers={"Authorization": f"Bearer {classifier.key}"},

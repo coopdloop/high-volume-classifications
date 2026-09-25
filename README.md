@@ -84,9 +84,17 @@ attacks; tighten it for volume, loosen it for safety.
 
 ## Backends
 
-`TYPESAFE_API_KEY` + `pip install typesafe-sdk` → real JEV. Otherwise an
-OpenRouter LLM emulates the same Noul/Choice/Score interface so the demo runs
-end-to-end without a TypeSafe key. System 2 uses `SYSTEM2_MODEL` via OpenRouter.
+JEV is on **OpenRouter** (`typesafe/jev-1.13`) via the Decisions API
+(`POST /api/alpha/decisions`) — one OpenRouter key runs the whole stack, no
+TypeSafe account or waitlist. `SYSTEM1_BACKEND` selects: `auto` (default:
+TypeSafe direct if `TYPESAFE_API_KEY` set, else JEV-via-OpenRouter),
+`typesafe`, `jev-openrouter`, or `emulated` (a chat LLM approximating the
+Noul/Choice/Score interface — useful as a comparison baseline, but its
+probabilities are not RLCD-calibrated). System 2 uses `SYSTEM2_MODEL` via
+OpenRouter chat completions.
+
+JEV scores are 0-based indices over the criteria; the client normalizes to
+1..N so `thresholds.yml` reads naturally (severity 1–5).
 
 ## Demo scenario
 
@@ -96,9 +104,33 @@ SMB to SRV-02 → PSEXESVC as `admin` → rundll32 staging → 512 MB egress to 
 rare `.ru` domain. System 1 escalates the chain; System 2 clusters ≥3 distinct
 tactics on an anchor (host/user) into a campaign and proposes containment.
 
+## System 2 extras
+
+- **Review-queue second pass** (`REVIEW_INTERVAL`, default 300s): the LLM
+  re-examines events JEV routed to `review` in the current window, in batch,
+  and can escalate them into campaign clustering.
+- **Cross-anchor stitching**: open campaigns whose host/user sets overlap are
+  merged automatically (e.g. a campaign anchored on `alice` and one on
+  `WS-104` become one).
+
+## Grafana dashboard
+
+`docker compose up -d` provisions a **JEV SOC Agent** dashboard (SOC folder):
+Loki log volume + raw logs, plus System-1 escalations, System-2 campaigns, and
+the pending SOAR approval queue via the Infinity plugin against `soc/api.py`
+(run the API before opening those panels).
+
+## Boss of the SOC replay
+
+```bash
+# download BOTS v3 separately (https://github.com/splunk/botsv3), then:
+python generator/bots_convert.py --input /path/to/botsv3.json --limit 50000
+```
+
+Maps Sysmon/stream:ip/O365 sourcetypes into our JSONL format and retimes the
+2018 timestamps to now (relative spacing preserved) so Loki accepts them.
+
 ## Later (not in POC)
 
 - Real SOAR execution at the `simulated-executed` point in `soc/api.py`
-- Grafana Infinity/JSON-API datasource against `soc/api.py` for alert panels
-- Splunk Boss of the SOC dataset replay through the same generator interface
 - Batch JEV requests / Alloy-native webhook consumer instead of Loki polling

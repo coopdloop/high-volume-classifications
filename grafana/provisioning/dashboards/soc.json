@@ -1,0 +1,115 @@
+{
+  "title": "JEV SOC Agent",
+  "uid": "jev-soc",
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "schemaVersion": 39,
+  "version": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Log volume by source",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (source) (count_over_time({job=\"soc\"}[$__interval]))",
+          "legendFormat": "{{source}}"
+        }
+      ],
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 2,
+      "type": "logs",
+      "title": "Raw logs ({job=\"soc\"})",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "loki" },
+      "targets": [ { "refId": "A", "expr": "{job=\"soc\"}" } ],
+      "options": { "showTime": true, "wrapLogMessage": true, "sortOrder": "Descending" }
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "System 1 — escalated events (JEV)",
+      "gridPos": { "x": 0, "y": 8, "w": 24, "h": 9 },
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "socapi" },
+      "targets": [
+        {
+          "refId": "A",
+          "type": "json",
+          "source": "url",
+          "url": "http://host.docker.internal:8000/alerts?decision=escalate&limit=50",
+          "parser": "backend",
+          "format": "table",
+          "root_selector": "",
+          "columns": [
+            { "selector": "id", "text": "id", "type": "number" },
+            { "selector": "source", "text": "source", "type": "string" },
+            { "selector": "host", "text": "host", "type": "string" },
+            { "selector": "user", "text": "user", "type": "string" },
+            { "selector": "is_suspicious", "text": "p(suspicious)", "type": "number" },
+            { "selector": "severity", "text": "severity", "type": "number" },
+            { "selector": "tactic", "text": "MITRE tactic", "type": "string" },
+            { "selector": "backend", "text": "backend", "type": "string" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "System 2 — campaigns",
+      "gridPos": { "x": 0, "y": 17, "w": 14, "h": 9 },
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "socapi" },
+      "targets": [
+        {
+          "refId": "A",
+          "type": "json",
+          "source": "url",
+          "url": "http://host.docker.internal:8000/campaigns",
+          "parser": "backend",
+          "format": "table",
+          "root_selector": "",
+          "columns": [
+            { "selector": "id", "text": "id", "type": "number" },
+            { "selector": "anchor", "text": "anchor", "type": "string" },
+            { "selector": "tactics", "text": "tactics", "type": "string" },
+            { "selector": "hosts", "text": "hosts", "type": "string" },
+            { "selector": "users", "text": "users", "type": "string" },
+            { "selector": "status", "text": "status", "type": "string" },
+            { "selector": "narrative", "text": "narrative", "type": "string" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "SOAR approval queue (pending)",
+      "gridPos": { "x": 14, "y": 17, "w": 10, "h": 9 },
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "socapi" },
+      "targets": [
+        {
+          "refId": "A",
+          "type": "json",
+          "source": "url",
+          "url": "http://host.docker.internal:8000/approvals?status=pending",
+          "parser": "backend",
+          "format": "table",
+          "root_selector": "",
+          "columns": [
+            { "selector": "id", "text": "id", "type": "number" },
+            { "selector": "campaign_id", "text": "campaign", "type": "number" },
+            { "selector": "action", "text": "action", "type": "string" },
+            { "selector": "risk", "text": "risk", "type": "string" },
+            { "selector": "disruptive_prob", "text": "p(disruptive)", "type": "number" }
+          ]
+        }
+      ]
+    }
+  ]
+}
