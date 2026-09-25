@@ -41,11 +41,12 @@ def _j(v) -> str:
 
 
 @contextmanager
-def llm_call(name: str, *, model: str, input_value):
+def llm_call(name: str, *, model: str, input_value, provider: str | None = None):
     """LLM span following OpenInference conventions (Phoenix renders these)."""
     with get().start_as_current_span(name) as span:
         span.set_attribute("openinference.span.kind", "LLM")
         span.set_attribute("llm.model_name", model or "?")
+        span.set_attribute("llm.provider", provider or (model.split("/")[0] if model and "/" in model else "unknown"))
         span.set_attribute("input.value", _j(input_value))
         span.set_attribute("input.mime_type", "application/json")
         yield span

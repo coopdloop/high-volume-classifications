@@ -53,7 +53,7 @@ class TypeSafeBackend:
                 sdk_qs[name] = self._Choice(instructions=q["instructions"], criteria=q["criteria"])
             else:
                 sdk_qs[name] = self._Score(instructions=q["instructions"], criteria=q["criteria"])
-        with tracing.llm_call("jev.classify", model=self.model,
+        with tracing.llm_call("jev.classify", model=self.model, provider="typesafe",
                               input_value={"state": state, "questions": qs}) as span:
             t0 = time.time()
             resp = self.client.system_one(state=state, questions=sdk_qs)
@@ -100,7 +100,7 @@ class JevOpenRouterBackend:
 
     def classify(self, state: str) -> Classification:
         qs = question_set()
-        with tracing.llm_call("jev.classify", model=self.model,
+        with tracing.llm_call("jev.classify", model=self.model, provider="typesafe",
                               input_value={"state": state, "questions": qs}) as span:
             t0 = time.time()
             data = self._decide(state, qs)
@@ -229,7 +229,7 @@ def noul_gate(classifier, state: str, instructions: str, record: dict | None = N
     for observability logging.
     """
     t0 = time.time()
-    with tracing.llm_call("jev.noul_gate", model=getattr(classifier, "model", "?"),
+    with tracing.llm_call("jev.noul_gate", model=getattr(classifier, "model", "?"), provider="typesafe",
                           input_value={"state": state, "question": instructions}) as span:
         if isinstance(classifier, TypeSafeBackend):
             prob = classifier.noul(state, instructions)

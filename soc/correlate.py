@@ -122,21 +122,27 @@ def _process_campaign(anchor: str, events: list[dict], classifier):
         campaign = existing
         campaign["hosts"] = sorted(set(json.loads(existing["hosts"])) | {e["host"] for e in events if e.get("host")})
         campaign["users"] = sorted(set(json.loads(existing["users"])) | {e["user"] for e in events if e.get("user")})
-        campaign["tactics"] = sorted(set(json.loads(existing["tactics"])) | {e["tactic"] for e in events if e.get("tactic")})
+        campaign["tactics"] = sorted((set(json.loads(existing["tactics"])) | {e["tactic"] for e in events if e.get("tactic")}) - {"benign"})
         campaign["event_ids"] = json.loads(existing["event_ids"]) + [e["id"] for e in events]
     else:
         campaign = {
             "anchor": anchor,
             "hosts": sorted({e["host"] for e in events if e.get("host")}),
             "users": sorted({e["user"] for e in events if e.get("user")}),
-            "tactics": sorted({e["tactic"] for e in events if e.get("tactic")}),
+            "tactics": sorted({e["tactic"] for e in events if e.get("tactic") and e["tactic"] != "benign"}),
             "event_ids": [e["id"] for e in events],
         }
     print(f"\n[campaign] {'updating' if existing else 'NEW'} campaign on anchor={anchor} "
           f"tactics={campaign['tactics']}")
-    analysis = system2_reason(events, anchor)
-    campaign["narrative"] = analysis.get("narrative", "")
     cid = store.upsert_campaign(campaign)
+    # Reason over ALL campaign events (most recent 50), not just the new batch
+    ids = campaign["event_ids"][-50:]
+    placeholders = ",".join("?" * len(ids))
+    all_events = store.query(f"SELECT * FROM events WHERE id IN ({placeholders}) ORDER BY ts", tuple(ids))
+    analysis = system2_reason(all_events, anchor)
+    campaign["id"] = cid
+    campaign["narrative"] = analysis.get("narrative", "")
+    store.upsert_campaign(campaign)
     print(f"[campaign #{cid}] {campaign['narrative']}")
 
     for action in analysis.get("recommended_actions", []):
@@ -159,7 +165,7 @@ def _process_campaign(anchor: str, events: list[dict], classifier):
 
 def llm_json(prompt: str, purpose: str = "system2", campaign_id: int | None = None) -> dict:
     model = os.getenv("SYSTEM2_MODEL", "openai/gpt-4o-mini")
-    with tracing.llm_call("system2.reason", model=model,
+    with tracing.llm_call("system2.reason", model=model, provider=model.split("/")[0],
                           input_value={"messages": [{"role": "user", "content": prompt}]}) as span:
         t0 = time.time()
         r = httpx.post(
