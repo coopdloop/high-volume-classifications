@@ -14,7 +14,7 @@ import httpx
 import yaml
 from dotenv import load_dotenv
 
-from . import agentlog, store
+from . import agentlog, store, tracing
 from .jev_client import get_classifier, noul_gate
 
 load_dotenv()
@@ -112,6 +112,11 @@ def system2_reason(events: list[dict], anchor: str) -> dict:
 
 
 def process_campaign(anchor: str, events: list[dict], classifier):
+    with tracing.chain("soc.campaign", **{"campaign.anchor": anchor, "campaign.new_events": len(events)}):
+        _process_campaign(anchor, events, classifier)
+
+
+def _process_campaign(anchor: str, events: list[dict], classifier):
     existing = store.find_open_campaign(anchor)
     if existing:
         campaign = existing
@@ -154,26 +159,31 @@ def process_campaign(anchor: str, events: list[dict], classifier):
 
 def llm_json(prompt: str, purpose: str = "system2", campaign_id: int | None = None) -> dict:
     model = os.getenv("SYSTEM2_MODEL", "openai/gpt-4o-mini")
-    t0 = time.time()
-    r = httpx.post(
-        "https://openrouter.ai/api/v1/chat/completions",
-        headers={"Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}"},
-        json={
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-            "response_format": {"type": "json_object"},
-            "temperature": 0.2,
-        },
-        timeout=120,
-    )
-    r.raise_for_status()
-    data = r.json()
-    text = data["choices"][0]["message"]["content"]
-    parsed = json.loads(re.sub(r"^```(json)?|```$", "", text.strip(), flags=re.M))
+    with tracing.llm_call("system2.reason", model=model,
+                          input_value={"messages": [{"role": "user", "content": prompt}]}) as span:
+        t0 = time.time()
+        r = httpx.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={"Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}"},
+            json={
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "response_format": {"type": "json_object"},
+                "temperature": 0.2,
+            },
+            timeout=120,
+        )
+        r.raise_for_status()
+        data = r.json()
+        latency = (time.time() - t0) * 1000
+        text = data["choices"][0]["message"]["content"]
+        parsed = json.loads(re.sub(r"^```(json)?|```$", "", text.strip(), flags=re.M))
+        usage = data.get("usage") or {}
+        tracing.finish(span, parsed, usage=usage, cost=usage.get("cost"),
+                       metadata={"purpose": purpose, "latency_ms": latency})
     agentlog.log_model_call(
         system=purpose, backend="openrouter-chat", model=model,
-        latency_ms=(time.time() - t0) * 1000,
-        cost=(data.get("usage") or {}).get("cost"),
+        latency_ms=latency, cost=usage.get("cost"),
         request={"prompt": prompt}, response=parsed, campaign_id=campaign_id,
     )
     return parsed
@@ -247,6 +257,7 @@ def stitch_campaigns():
 
 def main():
     store.init()
+    tracing.init()
     policy = load_policy()
     window_sec = int(policy.get("window_minutes", 20)) * 60
     classifier = get_classifier()

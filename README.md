@@ -128,6 +128,20 @@ choice probabilities, per-level score distributions, noul values):
   p(suspicious), p(needs_context), severity, tactic, the full tactic
   probability map, latency, and cost per call
 
+## Request tracing (Phoenix)
+
+Self-hosted [Arize Phoenix](https://phoenix.arize.com) runs in compose at
+**http://localhost:6006** — a LangSmith-style trace UI fed via OpenTelemetry
+with OpenInference span conventions. Every model call is a span with the full
+request payload (state + questions / messages), raw response (incl. JEV
+probability maps), token counts, cost, and latency:
+
+- `soc.event` (CHAIN) → one trace per log event, with `jev.classify` (LLM)
+  nested inside, plus decision/severity/tactic attributes
+- `soc.campaign` (CHAIN) → System-2 narrative call + one `jev.noul_gate`
+  guardrail span per recommended action
+- Filter by project `jev-soc-agent`; disable with `PHOENIX_ENABLED=false`
+
 ## Grafana dashboard
 
 `docker compose up -d` provisions a **JEV SOC Agent** dashboard (SOC folder):

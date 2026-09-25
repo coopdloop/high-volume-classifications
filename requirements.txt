@@ -3,5 +3,7 @@ fastapi>=0.110
 uvicorn>=0.29
 pyyaml>=6.0
 python-dotenv>=1.0
+opentelemetry-sdk>=1.27
+opentelemetry-exporter-otlp-proto-http>=1.27
 # Real System-1 backend (set TYPESAFE_API_KEY, then uncomment):
 # typesafe-sdk

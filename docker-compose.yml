@@ -35,5 +35,16 @@ services:
     depends_on:
       - loki
 
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    ports:
+      - "6006:6006"
+      - "4317:4317"
+    environment:
+      - PHOENIX_WORKING_DIR=/phoenix
+    volumes:
+      - phoenix-data:/phoenix
+
 volumes:
   loki-data:
+  phoenix-data:

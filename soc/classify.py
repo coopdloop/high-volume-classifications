@@ -12,7 +12,7 @@ import httpx
 import yaml
 from dotenv import load_dotenv
 
-from . import agentlog, enrich, store
+from . import agentlog, enrich, store, tracing
 from .jev_client import get_classifier
 from .questions import question_set
 
@@ -89,6 +89,7 @@ def fetch_logs(since_ns: int) -> list[tuple[int, dict]]:
 
 def main():
     store.init()
+    tracing.init()
     policy = load_policy()
     window_sec = int(policy.get("window_minutes", 20)) * 60
     assets = enrich.load_assets()
@@ -106,37 +107,46 @@ def main():
             cursor = max(cursor, ts_ns + 1)
             ev["ts"] = ts_ns / 1e9
             ev["ts_iso"] = datetime.fromtimestamp(ev["ts"], tz=timezone.utc).isoformat()
-            state = enrich.build_state(ev, window_sec, assets)
-            try:
-                c = classifier.classify(state)
-            except Exception as e:
-                print(f"[classify] classifier error: {e}")
-                continue
-            host_info = (assets.get("hosts") or {}).get(ev.get("host"), {})
-            decision = decide(c, host_info.get("criticality"), policy)
-            rec = {
-                **ev,
-                "is_suspicious": c.nouls.get("is_suspicious"),
-                "suspicious_confidence": min(1.0, abs(c.nouls.get("is_suspicious", 0.5) - 0.5) * 2),
-                "severity": c.scores.get("severity", {}).get("score"),
-                "severity_confidence": c.scores.get("severity", {}).get("confidence"),
-                "tactic": c.choices.get("mitre_tactic", {}).get("choice"),
-                "tactic_confidence": c.choices.get("mitre_tactic", {}).get("confidence"),
-                "needs_context": c.nouls.get("needs_context"),
-                "decision": decision,
-                "backend": c.backend,
-            }
-            event_id = store.insert_event(rec)
-            agentlog.log_model_call(
-                system="system1", backend=c.backend, model=c.model,
-                latency_ms=c.latency_ms, cost=c.cost,
-                request={"state": state, "questions": question_set()},
-                response=c.raw, event_id=event_id,
-            )
-            flag = {"escalate": "!!", "review": "??", "benign": "  "}[decision]
-            print(f"{flag} [{ev['source']:8}] {(ev.get('host') or '-'):7} {(ev.get('user') or '-'):10} "
-                  f"susp={rec['is_suspicious']:.2f} sev={rec['severity']:.1f} "
-                  f"tactic={rec['tactic'] or '-':18} -> {decision}")
+            with tracing.chain("soc.event", **{
+                "event.source": ev.get("source"), "event.host": ev.get("host"),
+                "event.user": ev.get("user"),
+            }) as event_span:
+                state = enrich.build_state(ev, window_sec, assets)
+                try:
+                    c = classifier.classify(state)
+                except Exception as e:
+                    print(f"[classify] classifier error: {e}")
+                    continue
+                host_info = (assets.get("hosts") or {}).get(ev.get("host"), {})
+                decision = decide(c, host_info.get("criticality"), policy)
+                rec = {
+                    **ev,
+                    "is_suspicious": c.nouls.get("is_suspicious"),
+                    "suspicious_confidence": min(1.0, abs(c.nouls.get("is_suspicious", 0.5) - 0.5) * 2),
+                    "severity": c.scores.get("severity", {}).get("score"),
+                    "severity_confidence": c.scores.get("severity", {}).get("confidence"),
+                    "tactic": c.choices.get("mitre_tactic", {}).get("choice"),
+                    "tactic_confidence": c.choices.get("mitre_tactic", {}).get("confidence"),
+                    "needs_context": c.nouls.get("needs_context"),
+                    "decision": decision,
+                    "backend": c.backend,
+                }
+                event_id = store.insert_event(rec)
+                agentlog.log_model_call(
+                    system="system1", backend=c.backend, model=c.model,
+                    latency_ms=c.latency_ms, cost=c.cost,
+                    request={"state": state, "questions": question_set()},
+                    response=c.raw, event_id=event_id,
+                )
+                event_span.set_attribute("event.id", event_id)
+                event_span.set_attribute("event.decision", decision)
+                event_span.set_attribute("event.is_suspicious", rec["is_suspicious"])
+                event_span.set_attribute("event.severity", rec["severity"])
+                event_span.set_attribute("event.tactic", rec["tactic"] or "")
+                flag = {"escalate": "!!", "review": "??", "benign": "  "}[decision]
+                print(f"{flag} [{ev['source']:8}] {(ev.get('host') or '-'):7} {(ev.get('user') or '-'):10} "
+                      f"susp={rec['is_suspicious']:.2f} sev={rec['severity']:.1f} "
+                      f"tactic={rec['tactic'] or '-':18} -> {decision}")
             save_cursor(cursor)
         time.sleep(POLL)
 
