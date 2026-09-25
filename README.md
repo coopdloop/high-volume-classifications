@@ -33,6 +33,12 @@ generator/campaign.py ──JSONL──▶ Alloy ──▶ Loki ──▶ soc/cl
                                           (approve → simulated-executed)
 ```
 
+## Diagrams
+
+- [diagrams/architecture.md](diagrams/architecture.md) — full system flow
+- [diagrams/state-assembly.md](diagrams/state-assembly.md) — deterministic per-event context construction (JEV is stateless)
+- [diagrams/feedback-loop.md](diagrams/feedback-loop.md) — escalation-count memory loop in SQLite
+
 ## Quickstart
 
 ```bash
