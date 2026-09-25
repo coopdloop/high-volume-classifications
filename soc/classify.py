@@ -127,10 +127,10 @@ def main():
             }
             store.insert_event(rec)
             flag = {"escalate": "!!", "review": "??", "benign": "  "}[decision]
-            print(f"{flag} [{ev['source']:8}] {ev.get('host','-'):7} {ev.get('user','-'):10} "
+            print(f"{flag} [{ev['source']:8}] {(ev.get('host') or '-'):7} {(ev.get('user') or '-'):10} "
                   f"susp={rec['is_suspicious']:.2f} sev={rec['severity']:.1f} "
                   f"tactic={rec['tactic'] or '-':18} -> {decision}")
-        save_cursor(cursor)
+            save_cursor(cursor)
         time.sleep(POLL)
 
 
