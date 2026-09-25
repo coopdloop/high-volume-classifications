@@ -1,6 +1,7 @@
 data/
 .env
 .pi/
+.run/
 __pycache__/
 .venv/
 *.pyc

@@ -26,15 +26,10 @@ assembled in code per event. Diagrams: [architecture](diagrams/architecture.md) 
 ## Quickstart
 
 ```bash
-docker compose up -d              # Loki, Alloy, Grafana :3000, Phoenix :6006
-pip install -r requirements.txt
-cp env.example .env               # add OPENROUTER_API_KEY (runs JEV + LLM)
-
-python -m soc.classify            # terminal 1: System 1
-python -m soc.correlate           # terminal 2: System 2
-uvicorn soc.api:app --port 8000   # terminal 3: approval queue
-
-python generator/campaign.py --speed 60   # fire the synthetic attack
+make install   # deps + .env scaffold (then add OPENROUTER_API_KEY to .env)
+make dev       # platform + pipeline daemons, one command
+make attack    # fire the synthetic attack
+make logs      # follow daemon output   ·   make stop / make down / make clean
 ```
 
 Watch: classify stdout · Grafana Explore `{job="soc"}` / `{job="soc-agent"}` ·
@@ -51,4 +46,4 @@ Phoenix traces · `curl localhost:8000/approvals?status=pending`
 | `generator/` | synthetic attack campaign + BOTS v3 converter |
 | `diagrams/`, `docs/` | mermaid diagrams, technical writeup |
 
-Lint mermaid before pushing: `python3 scripts/lint_mermaid.py`
+Lint mermaid before pushing: `make lint`
