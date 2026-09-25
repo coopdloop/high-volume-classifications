@@ -10,7 +10,7 @@ import sys
 import urllib.request
 
 fail = 0
-for path in sorted(glob.glob("diagrams/*.md")):
+for path in sorted(glob.glob("diagrams/*.md")) + ["README.md", "docs/blog-post.md"]:
     text = open(path).read()
     blocks = re.findall(r"```mermaid\n(.*?)```", text, re.S)
     for i, block in enumerate(blocks, 1):

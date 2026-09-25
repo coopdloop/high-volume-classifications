@@ -11,12 +11,13 @@ something. Full writeup: **[docs/blog-post.md](docs/blog-post.md)**.
 
 ## How it works
 
-```
-logs ─▶ Alloy ─▶ Loki ─▶ System 1: JEV (enrich → classify → route)
-                              │ escalate
-                              ▼
-                    System 2: LLM ─▶ campaign ─▶ playbook
-                              └─▶ JEV guardrail ─▶ human approval
+```mermaid
+flowchart LR
+    L[logs] --> A[Alloy] --> K[(Loki)] --> S1["System 1: JEV<br/>enrich → classify → route"]
+    S1 -->|escalate| S2["System 2: LLM<br/>campaign → narrative → playbook"]
+    S2 --> G["JEV guardrail"] --> H["human approval queue"]
+    style S1 fill:#7c2d12,stroke:#fb923c,color:#fff
+    style S2 fill:#1e3a8a,stroke:#60a5fa,color:#fff
 ```
 
 JEV is stateless — context (asset criticality, recent escalations) is
@@ -46,4 +47,4 @@ Phoenix traces · `curl localhost:8000/approvals?status=pending`
 | `generator/` | synthetic attack campaign + BOTS v3 converter |
 | `diagrams/`, `docs/` | mermaid diagrams, technical writeup |
 
-Lint mermaid before pushing: `make lint`
+Lint mermaid before pushing: `make lint` (covers README too)
