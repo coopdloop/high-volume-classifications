@@ -32,7 +32,9 @@ flowchart TB
     DB[(SQLite<br/>events · campaigns<br/>approvals · model_calls)]
     API[FastAPI :8000<br/>approval queue]
 
-    G & B --> AL --> LO
+    G --> AL
+    B --> AL
+    AL --> LO
     LO -->|poll 5s| EN
     PO -->|all decisions| DB
     PO -->|escalate| CL
@@ -41,8 +43,10 @@ flowchart TB
     DB --> API
     API --> GF
     LO --> GF
-    S1 & S2 -.OTLP.-> PH
-    S1 & S2 -.agent.log.-> AL
+    S1 -.OTLP.-> PH
+    S2 -.OTLP.-> PH
+    S1 -.agent.log.-> AL
+    S2 -.agent.log.-> AL
 
     style JV fill:#7c2d12,stroke:#fb923c,color:#fff
     style LL fill:#1e3a8a,stroke:#60a5fa,color:#fff
