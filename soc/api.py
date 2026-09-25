@@ -45,6 +45,53 @@ def approvals(status: str = "pending"):
     )
 
 
+def _flatten_call(r: dict) -> dict:
+    """Flatten a model_calls row; surface JEV probability maps for System 1."""
+    out = {k: r[k] for k in ("id", "ts", "system", "backend", "model", "event_id",
+                             "campaign_id", "latency_ms", "cost")}
+    out["ts_iso"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(r["ts"]))
+    try:
+        resp = json.loads(r["response"]) if r.get("response") else {}
+    except (json.JSONDecodeError, TypeError):
+        resp = {}
+    if r["system"] == "system1":
+        # JEV shape: {qname: {noul|choice|score, probabilities, confidence}}
+        # emulated shape: {nouls: {...}, choices: {...}, scores: {...}}
+        nouls = resp.get("nouls") or {k: v.get("noul") for k, v in resp.items() if isinstance(v, dict) and "noul" in v}
+        choices = resp.get("choices") or {k: v for k, v in resp.items() if isinstance(v, dict) and "choice" in v}
+        scores = resp.get("scores") or {k: v for k, v in resp.items() if isinstance(v, dict) and "score" in v}
+        out["is_suspicious"] = nouls.get("is_suspicious")
+        out["needs_context"] = nouls.get("needs_context")
+        out["tactic"] = (choices.get("mitre_tactic") or {}).get("choice")
+        out["tactic_probabilities"] = json.dumps((choices.get("mitre_tactic") or {}).get("probabilities", {}))
+        out["severity"] = (scores.get("severity") or {}).get("score")
+        out["severity_probabilities"] = json.dumps((scores.get("severity") or {}).get("probabilities", {}))
+    elif r["system"] == "guardrail":
+        gate = resp.get("gate") or {}
+        out["disruptive_prob"] = gate.get("noul") if isinstance(gate, dict) else gate
+    return out
+
+
+@app.get("/model-calls")
+def model_calls(system: str | None = None, limit: int = 100):
+    if system:
+        rows = store.query("SELECT * FROM model_calls WHERE system = ? ORDER BY id DESC LIMIT ?", (system, limit))
+    else:
+        rows = store.query("SELECT * FROM model_calls ORDER BY id DESC LIMIT ?", (limit,))
+    return [_flatten_call(r) for r in rows]
+
+
+@app.get("/model-calls/{call_id}")
+def model_call_detail(call_id: int):
+    rows = store.query("SELECT * FROM model_calls WHERE id = ?", (call_id,))
+    if not rows:
+        raise HTTPException(404, "call not found")
+    r = rows[0]
+    r["request"] = json.loads(r["request"])
+    r["response"] = json.loads(r["response"])
+    return r
+
+
 class Decision(BaseModel):
     decision: str  # approve | reject
 

@@ -14,7 +14,7 @@ import httpx
 import yaml
 from dotenv import load_dotenv
 
-from . import store
+from . import agentlog, store
 from .jev_client import get_classifier, noul_gate
 
 load_dotenv()
@@ -136,7 +136,15 @@ def process_campaign(anchor: str, events: list[dict], classifier):
 
     for action in analysis.get("recommended_actions", []):
         # Auto Mode guardrail: JEV gates the SOAR action before it enters the queue
-        p = noul_gate(classifier, json.dumps(action), GUARDRAIL_QUESTION)
+        gate_rec: dict = {}
+        p = noul_gate(classifier, json.dumps(action), GUARDRAIL_QUESTION, record=gate_rec)
+        agentlog.log_model_call(
+            system="guardrail", backend=gate_rec.get("backend", "?"),
+            model=gate_rec.get("model", "?"), latency_ms=gate_rec.get("latency_ms", 0),
+            cost=gate_rec.get("cost"),
+            request={"state": json.dumps(action), "question": GUARDRAIL_QUESTION},
+            response=gate_rec.get("raw"), campaign_id=cid,
+        )
         action["disruptive_prob"] = p
         if p > 0.7 and action.get("risk") != "high":
             action["risk"] = "high"
@@ -144,8 +152,9 @@ def process_campaign(anchor: str, events: list[dict], classifier):
         print(f"  [approval #{aid}] ({action['risk']}, disrupt_p={p:.2f}) {action['action']}")
 
 
-def llm_json(prompt: str) -> dict:
+def llm_json(prompt: str, purpose: str = "system2", campaign_id: int | None = None) -> dict:
     model = os.getenv("SYSTEM2_MODEL", "openai/gpt-4o-mini")
+    t0 = time.time()
     r = httpx.post(
         "https://openrouter.ai/api/v1/chat/completions",
         headers={"Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}"},
@@ -158,8 +167,16 @@ def llm_json(prompt: str) -> dict:
         timeout=120,
     )
     r.raise_for_status()
-    text = r.json()["choices"][0]["message"]["content"]
-    return json.loads(re.sub(r"^```(json)?|```$", "", text.strip(), flags=re.M))
+    data = r.json()
+    text = data["choices"][0]["message"]["content"]
+    parsed = json.loads(re.sub(r"^```(json)?|```$", "", text.strip(), flags=re.M))
+    agentlog.log_model_call(
+        system=purpose, backend="openrouter-chat", model=model,
+        latency_ms=(time.time() - t0) * 1000,
+        cost=(data.get("usage") or {}).get("cost"),
+        request={"prompt": prompt}, response=parsed, campaign_id=campaign_id,
+    )
+    return parsed
 
 
 def review_batch(policy: dict, classifier):

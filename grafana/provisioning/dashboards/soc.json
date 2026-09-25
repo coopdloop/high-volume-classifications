@@ -261,6 +261,95 @@
           }
         }
       ]
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "System 1 \u2014 JEV decision log (probability maps)",
+      "gridPos": {
+        "x": 0,
+        "y": 26,
+        "w": 24,
+        "h": 10
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "socapi"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "type": "json",
+          "source": "url",
+          "url": "http://host.docker.internal:8000/model-calls?system=system1&limit=100",
+          "parser": "backend",
+          "format": "table",
+          "root_selector": "",
+          "url_options": {
+            "method": "GET",
+            "data": "",
+            "params": [],
+            "headers": []
+          },
+          "columns": [
+            {
+              "selector": "id",
+              "text": "call",
+              "type": "number"
+            },
+            {
+              "selector": "ts_iso",
+              "text": "time",
+              "type": "string"
+            },
+            {
+              "selector": "event_id",
+              "text": "event",
+              "type": "number"
+            },
+            {
+              "selector": "model",
+              "text": "model",
+              "type": "string"
+            },
+            {
+              "selector": "is_suspicious",
+              "text": "p(susp)",
+              "type": "number"
+            },
+            {
+              "selector": "needs_context",
+              "text": "p(needs_ctx)",
+              "type": "number"
+            },
+            {
+              "selector": "severity",
+              "text": "sev",
+              "type": "number"
+            },
+            {
+              "selector": "tactic",
+              "text": "tactic",
+              "type": "string"
+            },
+            {
+              "selector": "tactic_probabilities",
+              "text": "tactic prob map",
+              "type": "string"
+            },
+            {
+              "selector": "latency_ms",
+              "text": "ms",
+              "type": "number"
+            },
+            {
+              "selector": "cost",
+              "text": "cost $",
+              "type": "number"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

@@ -24,6 +24,13 @@ CREATE TABLE IF NOT EXISTS campaigns (
   hosts TEXT, users TEXT, tactics TEXT, event_ids TEXT,
   narrative TEXT, status TEXT DEFAULT 'open'
 );
+CREATE TABLE IF NOT EXISTS model_calls (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts REAL, system TEXT, backend TEXT, model TEXT,
+  event_id INTEGER, campaign_id INTEGER,
+  latency_ms REAL, cost REAL,
+  request TEXT, response TEXT
+);
 CREATE TABLE IF NOT EXISTS approvals (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   campaign_id INTEGER, action TEXT, risk TEXT, reason TEXT,
@@ -123,6 +130,21 @@ def insert_approval(campaign_id: int, action: dict) -> int:
             "INSERT INTO approvals (campaign_id, action, risk, reason, disruptive_prob, created_at) VALUES (?,?,?,?,?,?)",
             (campaign_id, action["action"], action.get("risk", "medium"),
              action.get("reason", ""), action.get("disruptive_prob"), time.time()),
+        )
+        return cur.lastrowid
+
+
+def insert_model_call(rec: dict) -> int:
+    with db() as conn:
+        cur = conn.execute(
+            """INSERT INTO model_calls (ts, system, backend, model, event_id,
+               campaign_id, latency_ms, cost, request, response)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (
+                rec["ts"], rec["system"], rec.get("backend"), rec.get("model"),
+                rec.get("event_id"), rec.get("campaign_id"), rec.get("latency_ms"),
+                rec.get("cost"), json.dumps(rec.get("request")), json.dumps(rec.get("response")),
+            ),
         )
         return cur.lastrowid
 

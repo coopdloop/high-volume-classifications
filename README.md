@@ -113,6 +113,21 @@ tactics on an anchor (host/user) into a campaign and proposes containment.
   merged automatically (e.g. a campaign anchored on `alice` and one on
   `WS-104` become one).
 
+## Agent observability (model-call logging)
+
+Every model call is recorded with full request/response, model id, latency,
+and `usage.cost` — including JEV's **complete probability maps** (per-option
+choice probabilities, per-level score distributions, noul values):
+
+- SQLite `model_calls` table → `GET /model-calls?system=system1|system2|guardrail`
+  (flattened) and `GET /model-calls/{id}` (full raw state + answers)
+- Mirrored as JSONL to `data/logs/agent.log` → Alloy ships it to Loki as
+  `job="soc-agent"`, so in Explore you can watch JEV's decisions
+  chronologically next to the raw logs: `{job="soc-agent"} | json`
+- Grafana panel **"System 1 — JEV decision log (probability maps)"** shows
+  p(suspicious), p(needs_context), severity, tactic, the full tactic
+  probability map, latency, and cost per call
+
 ## Grafana dashboard
 
 `docker compose up -d` provisions a **JEV SOC Agent** dashboard (SOC folder):

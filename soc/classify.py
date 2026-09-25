@@ -12,8 +12,9 @@ import httpx
 import yaml
 from dotenv import load_dotenv
 
-from . import enrich, store
+from . import agentlog, enrich, store
 from .jev_client import get_classifier
+from .questions import question_set
 
 load_dotenv()
 LOKI = os.getenv("LOKI_URL", "http://localhost:3100")
@@ -125,7 +126,13 @@ def main():
                 "decision": decision,
                 "backend": c.backend,
             }
-            store.insert_event(rec)
+            event_id = store.insert_event(rec)
+            agentlog.log_model_call(
+                system="system1", backend=c.backend, model=c.model,
+                latency_ms=c.latency_ms, cost=c.cost,
+                request={"state": state, "questions": question_set()},
+                response=c.raw, event_id=event_id,
+            )
             flag = {"escalate": "!!", "review": "??", "benign": "  "}[decision]
             print(f"{flag} [{ev['source']:8}] {(ev.get('host') or '-'):7} {(ev.get('user') or '-'):10} "
                   f"susp={rec['is_suspicious']:.2f} sev={rec['severity']:.1f} "

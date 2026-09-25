@@ -3,6 +3,7 @@ local.file_match "soc" {
     { __path__ = "/var/log/soc/sysmon.log",   job = "soc", source = "sysmon" },
     { __path__ = "/var/log/soc/okta.log",     job = "soc", source = "okta" },
     { __path__ = "/var/log/soc/firewall.log", job = "soc", source = "firewall" },
+    { __path__ = "/var/log/soc/agent.log",    job = "soc-agent", source = "agent" },
   ]
 }
 
