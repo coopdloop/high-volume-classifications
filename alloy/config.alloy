@@ -1,0 +1,18 @@
+local.file_match "soc" {
+  path_targets = [
+    { __path__ = "/var/log/soc/sysmon.log",   job = "soc", source = "sysmon" },
+    { __path__ = "/var/log/soc/okta.log",     job = "soc", source = "okta" },
+    { __path__ = "/var/log/soc/firewall.log", job = "soc", source = "firewall" },
+  ]
+}
+
+loki.source.file "soc" {
+  targets    = local.file_match.soc.targets
+  forward_to = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

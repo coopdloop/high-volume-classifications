@@ -1,0 +1,11 @@
+hosts:
+  WS-104: { criticality: 3, type: workstation, owner: alice }
+  WS-219: { criticality: 2, type: workstation, owner: bob }
+  SRV-02: { criticality: 5, type: server, role: file-server }
+  DC-01:  { criticality: 5, type: domain-controller }
+
+users:
+  alice:      { role: finance-analyst, admin: false }
+  bob:        { role: engineer, admin: false }
+  svc_backup: { role: service-account, admin: true }
+  admin:      { role: domain-admin, admin: true }

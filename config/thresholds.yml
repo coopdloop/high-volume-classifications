@@ -1,0 +1,19 @@
+# System-1 routing policy. Evaluated in order; first match wins.
+# Available vars: is_suspicious, needs_context, severity, suspicious_confidence,
+#                 severity_confidence, tactic_confidence, tactic, host_criticality
+escalate:
+  - "is_suspicious >= 0.9"
+  - "severity >= 3.0 and is_suspicious >= 0.7"
+  - "suspicious_confidence < 0.55"   # low confidence -> safe default: escalate
+  - "needs_context >= 0.8 and severity >= 2.5 and is_suspicious >= 0.5"
+
+benign:
+  - "severity <= 2.0 and is_suspicious < 0.3 and suspicious_confidence >= 0.8"
+
+default: review
+
+window_minutes: 20
+
+campaign:
+  min_tactics: 3   # distinct MITRE tactics on same host/user within window
+  min_events: 5    # OR this many escalated events on same host/user
