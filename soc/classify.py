@@ -64,14 +64,20 @@ def save_cursor(ns: int):
         f.write(str(ns))
 
 
-def fetch_logs(since_ns: int) -> list[tuple[int, dict]]:
+CATCHUP_WINDOW_NS = 600 * 1_000_000_000  # bound catch-up queries: unbounded ranges hang Loki
+
+
+def fetch_logs(since_ns: int) -> tuple[list[tuple[int, dict]], int]:
+    end_ns = min(time.time_ns(), since_ns + CATCHUP_WINDOW_NS)
     r = httpx.get(
         f"{LOKI}/loki/api/v1/query_range",
         params={
             "query": '{job="soc"}',
             "start": since_ns,
+            "end": end_ns,
             "direction": "forward",
-            "limit": 500,
+            # keep response < 4MiB internal gRPC limit; fat raw lines make 400+ flaky
+            "limit": 150,
         },
         timeout=30,
     )
@@ -84,7 +90,7 @@ def fetch_logs(since_ns: int) -> list[tuple[int, dict]]:
             except json.JSONDecodeError:
                 continue
     out.sort(key=lambda x: x[0])
-    return out
+    return out, end_ns
 
 
 def main():
@@ -98,9 +104,16 @@ def main():
     print(f"[classify] backend={classifier.name} polling {LOKI} every {POLL}s")
     while True:
         try:
-            events = fetch_logs(cursor)
+            events, end_ns = fetch_logs(cursor)
         except Exception as e:
             print(f"[classify] loki error: {e}")
+            time.sleep(POLL)
+            continue
+        if not events:
+            # walk the cursor through empty windows when catching up
+            if end_ns > cursor:
+                cursor = end_ns + 1
+                save_cursor(cursor)
             time.sleep(POLL)
             continue
         for ts_ns, ev in events:

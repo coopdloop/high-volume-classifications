@@ -13,7 +13,7 @@ up: ## log platform (loki, alloy, grafana, phoenix)
 down: ## stop platform
 	docker compose down
 
-dev: up ## start the full stack (platform + classify + correlate + api)
+dev: stop up ## start the full stack (platform + classify + correlate + api)
 	@mkdir -p $(RUN_DIR) data/logs
 	@nohup $(PY) -m soc.classify  > $(RUN_DIR)/classify.log 2>&1 & echo $$! > $(RUN_DIR)/classify.pid
 	@nohup $(PY) -m soc.correlate > $(RUN_DIR)/correlate.log 2>&1 & echo $$! > $(RUN_DIR)/correlate.pid

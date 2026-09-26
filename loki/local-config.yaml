@@ -2,6 +2,9 @@ auth_enabled: false
 
 server:
   http_listen_port: 3100
+  # fat log lines (full raw records) can exceed the 4MiB internal gRPC default
+  grpc_server_max_recv_msg_size: 33554432
+  grpc_server_max_send_msg_size: 33554432
 
 common:
   instance_addr: 127.0.0.1
