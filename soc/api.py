@@ -3,6 +3,7 @@
 import json
 import time
 
+import yaml
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
@@ -21,6 +22,41 @@ def health():
     return {"ok": True}
 
 
+@app.get("/stats")
+def stats():
+    row = store.query(
+        "SELECT COUNT(*) n, SUM(decision='escalate') esc, SUM(decision='review') rev,"
+        " SUM(decision='benign') ben FROM events"
+    )[0]
+    cost = store.query("SELECT system, COUNT(*) n, SUM(cost) cost, AVG(latency_ms) ms FROM model_calls GROUP BY system")
+    return {
+        "classified": row["n"] or 0,
+        "escalate": row["esc"] or 0,
+        "review": row["rev"] or 0,
+        "benign": row["ben"] or 0,
+        "campaigns": store.query("SELECT COUNT(*) n FROM campaigns")[0]["n"],
+        "approvals_pending": store.query("SELECT COUNT(*) n FROM approvals WHERE status='pending'")[0]["n"],
+        "calls": {c["system"]: {"n": c["n"], "cost": c["cost"], "avg_ms": c["ms"]} for c in cost},
+    }
+
+
+@app.get("/scorecard")
+def scorecard():
+    try:
+        with open("config/ground_truth.yml") as f:
+            gt = yaml.safe_load(f)
+    except FileNotFoundError:
+        return []
+    out = []
+    for s in gt.get("signals", []):
+        pat = f"%{s['pattern']}%"
+        present = store.query("SELECT COUNT(*) n FROM events WHERE raw LIKE ?", (pat,))[0]["n"]
+        found = store.query("SELECT COUNT(*) n FROM events WHERE decision='escalate' AND raw LIKE ?", (pat,))[0]["n"]
+        status = "found" if found else ("missed" if present else ("no-telemetry" if s.get("in_telemetry") is False else "absent"))
+        out.append({**s, "present": present, "escalated": found, "status": status})
+    return out
+
+
 @app.get("/alerts")
 def alerts(decision: str = "escalate", limit: int = 100):
     return store.query(
@@ -36,6 +72,58 @@ def campaigns():
         for k in ("hosts", "users", "tactics", "event_ids"):
             r[k] = json.loads(r[k])
     return rows
+
+
+@app.get("/campaigns/{campaign_id}")
+def campaign_detail(campaign_id: int):
+    rows = store.query("SELECT * FROM campaigns WHERE id = ?", (campaign_id,))
+    if not rows:
+        raise HTTPException(404, "campaign not found")
+    c = rows[0]
+    for k in ("hosts", "users", "tactics", "event_ids"):
+        c[k] = json.loads(c[k])
+    ids = c["event_ids"][-50:]
+    c["events"] = store.query(
+        f"SELECT id, ts, source, host, user, is_suspicious, severity, tactic, decision FROM events"
+        f" WHERE id IN ({','.join('?' * len(ids))}) ORDER BY id DESC", tuple(ids),
+    ) if ids else []
+    c["approvals"] = store.query("SELECT * FROM approvals WHERE campaign_id = ? ORDER BY id", (campaign_id,))
+    return c
+
+
+@app.get("/events")
+def events(decision: str | None = None, q: str | None = None, limit: int = 50, offset: int = 0):
+    where, params = [], []
+    if decision:
+        where.append("decision = ?")
+        params.append(decision)
+    if q:
+        where.append("(raw LIKE ? OR host LIKE ? OR user LIKE ?)")
+        params += [f"%{q}%"] * 3
+    w = ("WHERE " + " AND ".join(where)) if where else ""
+    total = store.query(f"SELECT COUNT(*) n FROM events {w}", tuple(params))[0]["n"]
+    rows = store.query(
+        f"SELECT id, ts, source, host, user, is_suspicious, severity, tactic, needs_context, decision"
+        f" FROM events {w} ORDER BY id DESC LIMIT ? OFFSET ?",
+        (*params, min(limit, 200), offset),
+    )
+    return {"total": total, "rows": rows}
+
+
+@app.get("/events/{event_id}")
+def event_detail(event_id: int):
+    rows = store.query("SELECT * FROM events WHERE id = ?", (event_id,))
+    if not rows:
+        raise HTTPException(404, "event not found")
+    ev = rows[0]
+    ev["calls"] = [_flatten_call(r) for r in
+                   store.query("SELECT * FROM model_calls WHERE event_id = ? ORDER BY id", (event_id,))]
+    ev["campaigns"] = [
+        {"id": c["id"], "anchor": c["anchor"], "status": c["status"], "tactics": json.loads(c["tactics"])}
+        for c in store.query("SELECT id, anchor, status, tactics, event_ids FROM campaigns")
+        if event_id in json.loads(c["event_ids"])
+    ]
+    return ev
 
 
 @app.get("/approvals")
@@ -73,12 +161,14 @@ def _flatten_call(r: dict) -> dict:
 
 
 @app.get("/model-calls")
-def model_calls(system: str | None = None, limit: int = 100):
+def model_calls(system: str | None = None, limit: int = 100, offset: int = 0):
     if system:
-        rows = store.query("SELECT * FROM model_calls WHERE system = ? ORDER BY id DESC LIMIT ?", (system, limit))
+        rows = store.query("SELECT * FROM model_calls WHERE system = ? ORDER BY id DESC LIMIT ? OFFSET ?", (system, limit, offset))
+        total = store.query("SELECT COUNT(*) n FROM model_calls WHERE system = ?", (system,))[0]["n"]
     else:
-        rows = store.query("SELECT * FROM model_calls ORDER BY id DESC LIMIT ?", (limit,))
-    return [_flatten_call(r) for r in rows]
+        rows = store.query("SELECT * FROM model_calls ORDER BY id DESC LIMIT ? OFFSET ?", (limit, offset))
+        total = store.query("SELECT COUNT(*) n FROM model_calls")[0]["n"]
+    return {"total": total, "rows": [_flatten_call(r) for r in rows]}
 
 
 @app.get("/model-calls/{call_id}")

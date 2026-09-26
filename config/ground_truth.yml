@@ -1,0 +1,34 @@
+# BOTS v1 blind-eval ground truth (docs/botsv1-ground-truth.md).
+# pattern: substring match against events.raw. in_telemetry: false marks stages
+# whose logs were never pulled — absence is a coverage gap, not a detection miss.
+dataset: botsv1
+signals:
+  - signal: "Acunetix scan — 40.80.148.42"
+    pattern: "40.80.148.42"
+    attack: APT
+  - signal: "Brute force / C2 / staging — 23.22.63.114"
+    pattern: "23.22.63.114"
+    attack: APT
+  - signal: "Joomla login brute force"
+    pattern: "administrator/index.php"
+    attack: APT
+  - signal: "Uploaded payload 3791.exe"
+    pattern: "3791.exe"
+    attack: APT
+  - signal: "Cerber script stage 121214.tmp"
+    pattern: "121214.tmp"
+    attack: Cerber
+  - signal: "Cryptor download mhtr.jpg"
+    pattern: "mhtr.jpg"
+    attack: Cerber
+  - signal: "Cerber domain solidaritedeproximite.org"
+    pattern: "solidaritedeproximite"
+    attack: Cerber
+  - signal: "Ransom-note DNS cerberhhyed5frqa.xmfir0.win"
+    pattern: "cerberhhyed5frqa"
+    attack: Cerber
+    in_telemetry: false
+  - signal: "USB initial execution miranda_tate_unveiled.dotm"
+    pattern: "miranda_tate_unveiled"
+    attack: Cerber
+    in_telemetry: false

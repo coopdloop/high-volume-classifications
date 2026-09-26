@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>JEV SOC</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg:#0b0f14; --panel:#121a24; --panel2:#0e1520; --line:#1f2c3d; --fg:#d7e1ec; --dim:#7d8fa6;
+          --green:#34d399; --red:#f87171; --amber:#fbbf24; --blue:#60a5fa; --orange:#fb923c; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  a { color:var(--blue); text-decoration:none; } a:hover { text-decoration:underline; }
+  #app { display:grid; grid-template-columns:190px 1fr; min-height:100vh; }
+  nav { background:var(--panel2); border-right:1px solid var(--line); padding:16px 0; position:sticky; top:0; height:100vh; }
+  nav .brand { padding:0 16px 14px; font-weight:700; font-size:14px; border-bottom:1px solid var(--line); }
+  nav .brand small { display:block; color:var(--dim); font-weight:400; font-size:10px; margin-top:2px; }
+  nav a { display:block; padding:8px 16px; color:var(--dim); border-left:2px solid transparent; }
+  nav a:hover { color:var(--fg); text-decoration:none; background:var(--panel); }
+  nav a.active { color:var(--fg); border-left-color:var(--orange); background:var(--panel); }
+  main { padding:18px 22px; min-width:0; }
+  h1 { font-size:15px; margin:0 0 14px; }
+  h2 { font-size:12px; margin:0 0 10px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin-bottom:16px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+  .card .v { font-size:20px; font-weight:700; } .card .k { color:var(--dim); font-size:10px; text-transform:uppercase; }
+  section { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin-bottom:16px; }
+  table { width:100%; border-collapse:collapse; }
+  td,th { text-align:left; padding:5px 8px; border-bottom:1px solid var(--line); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:280px; }
+  th { color:var(--dim); font-weight:600; }
+  tbody tr.click { cursor:pointer; } tbody tr.click:hover { background:#16202e; }
+  .badge { display:inline-block; padding:1px 8px; border-radius:99px; font-size:11px; font-weight:700; }
+  .found,.escalate { background:#052e1b; color:var(--green); border:1px solid #14532d; }
+  .missed { background:#2d0a0a; color:var(--red); border:1px solid #7f1d1d; }
+  .no-telemetry,.benign { background:#1a2230; color:var(--dim); border:1px solid var(--line); }
+  .absent,.review { background:#241a08; color:var(--amber); border:1px solid #7c5a12; }
+  .open { background:#2d0a0a; color:var(--red); border:1px solid #7f1d1d; }
+  .merged,.closed { background:#1a2230; color:var(--dim); border:1px solid var(--line); }
+  .pending { background:#241a08; color:var(--amber); border:1px solid #7c5a12; }
+  .approved { background:#052e1b; color:var(--green); border:1px solid #14532d; }
+  .rejected { background:#2d0a0a; color:var(--red); border:1px solid #7f1d1d; }
+  .chip { background:#132030; border:1px solid var(--line); border-radius:4px; padding:0 6px; font-size:11px; color:var(--blue); }
+  .toolbar { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; align-items:center; }
+  input,select { background:var(--panel2); color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:5px 9px; font:inherit; font-size:12px; }
+  input:focus,select:focus { outline:1px solid var(--blue); }
+  button { background:#132030; color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font:inherit; font-size:12px; cursor:pointer; }
+  button:hover { border-color:var(--blue); }
+  button.ok { color:var(--green); } button.no { color:var(--red); }
+  button:disabled { opacity:.4; cursor:default; }
+  .pager { display:flex; gap:8px; align-items:center; margin-top:10px; color:var(--dim); font-size:12px; }
+  .muted { color:var(--dim); } .err { color:var(--red); padding:8px 0; }
+  .nar { color:var(--dim); white-space:pre-wrap; font-size:12.5px; }
+  pre { background:var(--panel2); border:1px solid var(--line); border-radius:6px; padding:10px; overflow:auto; font-size:11.5px; max-height:420px; }
+  details summary { cursor:pointer; color:var(--blue); margin-bottom:6px; }
+  .kv { display:grid; grid-template-columns:150px 1fr; gap:4px 12px; margin-bottom:12px; }
+  .kv div:nth-child(odd) { color:var(--dim); }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:900px){ .grid2 { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <nav>
+    <div class="brand">JEV SOC<small>botsv1 blind eval</small></div>
+    <a href="#/overview" data-r="overview">Overview</a>
+    <a href="#/scorecard" data-r="scorecard">Scorecard</a>
+    <a href="#/events" data-r="events">Events</a>
+    <a href="#/campaigns" data-r="campaigns">Campaigns</a>
+    <a href="#/approvals" data-r="approvals">Approvals</a>
+    <a href="#/calls" data-r="calls">Model calls</a>
+    <a href="#/dashboards" data-r="dashboards">Dashboards</a>
+  </nav>
+  <main id="view"></main>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+const api = p => fetch('/api' + p).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const num = (v, d=2) => v == null ? '-' : (+v).toFixed(d);
+const ts = v => v ? new Date(v * 1000).toISOString().slice(5, 19).replace('T', ' ') : '-';
+const badge = (txt, cls) => `<span class="badge ${cls}">${txt}</span>`;
+const decBadge = d => badge(d, d);
+
+// ---------- routing (hash slugs, shareable) ----------
+function route() {
+  const h = location.hash.slice(2) || 'overview';
+  const [pathQ, qs] = h.split('?');
+  const parts = pathQ.split('/');
+  return { name: parts[0] || 'overview', id: parts[1], q: new URLSearchParams(qs || '') };
+}
+function go(path) { location.hash = '#/' + path; }
+
+// ---------- shared table pager ----------
+function pager(total, page, size, base) {
+  const pages = Math.max(1, Math.ceil(total / size));
+  return `<div class="pager">
+    <button ${page <= 0 ? 'disabled' : ''} onclick="go('${base}page=${page - 1}')">← prev</button>
+    <span>page ${page + 1} / ${pages} · ${total} rows</span>
+    <button ${page >= pages - 1 ? 'disabled' : ''} onclick="go('${base}page=${page + 1}')">next →</button>
+  </div>`;
+}
+
+// ---------- views ----------
+async function vOverview() {
+  const [s, sc, camps, calls] = await Promise.all([
+    api('/stats'), api('/scorecard'), api('/campaigns'), api('/model-calls?system=system1&limit=8'),
+  ]);
+  const c1 = s.calls.system1 || {}, c2 = s.calls.system2 || {};
+  const found = sc.filter(r => r.status === 'found').length;
+  $('#view').innerHTML = `
+    <h1>Overview</h1>
+    <div class="cards">${[
+      ['classified', s.classified], ['escalate', s.escalate], ['review', s.review], ['benign', s.benign],
+      ['campaigns', s.campaigns], ['approvals', s.approvals_pending],
+      ['jev calls', c1.n || 0], ['jev cost', '$' + (c1.cost || 0).toFixed(3)],
+      ['llm calls', c2.n || 0], ['llm cost', '$' + (c2.cost || 0).toFixed(3)],
+    ].map(([k, v]) => `<div class="card"><div class="v">${v}</div><div class="k">${k}</div></div>`).join('')}</div>
+    <div class="grid2">
+      <section><h2>Ground truth — ${found}/${sc.length} found</h2>
+        <table>${sc.map(r => `<tr class="click" onclick="go('scorecard')">
+          <td>${badge(r.status, r.status)}</td><td class="muted">${esc(r.attack)}</td><td>${esc(r.signal)}</td></tr>`).join('')}</table>
+      </section>
+      <section><h2>Live JEV feed</h2>
+        <table><tr><th>time</th><th>event</th><th>p(susp)</th><th>sev</th><th>tactic</th></tr>
+        ${calls.rows.map(r => `<tr class="click" onclick="go('events/${r.event_id}')">
+          <td>${esc((r.ts_iso || '').slice(11, 19))}</td><td>#${r.event_id ?? '-'}</td>
+          <td>${num(r.is_suspicious)}</td><td>${num(r.severity, 1)}</td><td>${esc(r.tactic || '-')}</td></tr>`).join('')}</table>
+      </section>
+    </div>
+    <section><h2>Recent campaigns</h2>
+      <table><tr><th>id</th><th>anchor</th><th>status</th><th>tactics</th></tr>
+      ${camps.slice(0, 8).map(c => `<tr class="click" onclick="go('campaigns/${c.id}')">
+        <td>#${c.id}</td><td>${esc(c.anchor)}</td><td>${badge(c.status, c.status)}</td>
+        <td>${(c.tactics || []).map(t => `<span class="chip">${esc(t)}</span>`).join(' ')}</td></tr>`).join('')}</table>
+    </section>`;
+}
+
+async function vScorecard() {
+  const rows = await api('/scorecard');
+  const icon = { found: '✓', missed: '✗', 'no-telemetry': '⊘', absent: '?' };
+  $('#view').innerHTML = `<h1>Ground-truth scorecard</h1>
+    <section><table>
+      <tr><th>status</th><th>attack</th><th>signal</th><th>escalated</th><th>present</th></tr>
+      ${rows.map(r => `<tr><td>${badge(icon[r.status] + ' ' + r.status, r.status)}</td>
+        <td class="muted">${esc(r.attack)}</td><td>${esc(r.signal)}</td>
+        <td>${r.escalated}</td><td>${r.present}</td></tr>`).join('')}</table>
+      <p class="muted">found = ≥1 escalated event matches · missed = present but never escalated · no-telemetry = logs never pulled (coverage gap, not a miss)</p>
+    </section>`;
+}
+
+async function vEvents(r) {
+  const page = +(r.q.get('page') || 0), size = 50;
+  const decision = r.q.get('decision') || '', q = r.q.get('q') || '';
+  const d = await api(`/events?limit=${size}&offset=${page * size}&decision=${decision}&q=${encodeURIComponent(q)}`);
+  const base = `events?decision=${decision}&q=${encodeURIComponent(q)}&`;
+  $('#view').innerHTML = `<h1>Events</h1>
+    <section>
+      <div class="toolbar">
+        <input id="q" placeholder="search raw / host / user…" value="${esc(q)}" size="34">
+        <select id="dec">
+          ${['', 'escalate', 'review', 'benign'].map(o => `<option value="${o}" ${o === decision ? 'selected' : ''}>${o || 'all decisions'}</option>`).join('')}
+        </select>
+      </div>
+      <table><tr><th>id</th><th>time</th><th>source</th><th>host</th><th>user</th><th>p(susp)</th><th>sev</th><th>tactic</th><th>decision</th></tr>
+      ${d.rows.map(e => `<tr class="click" onclick="go('events/${e.id}')">
+        <td>#${e.id}</td><td>${ts(e.ts)}</td><td>${esc(e.source)}</td><td>${esc(e.host || '-')}</td><td>${esc(e.user || '-')}</td>
+        <td>${num(e.is_suspicious)}</td><td>${num(e.severity, 1)}</td><td>${esc(e.tactic || '-')}</td>
+        <td>${decBadge(e.decision)}</td></tr>`).join('')}</table>
+      ${pager(d.total, page, size, base)}
+    </section>`;
+  let t;
+  $('#q').oninput = e => { clearTimeout(t); t = setTimeout(() => go(`events?decision=${$('#dec').value}&q=${encodeURIComponent(e.target.value)}&page=0`), 350); };
+  $('#dec').onchange = e => go(`events?decision=${e.target.value}&q=${encodeURIComponent($('#q').value)}&page=0`);
+}
+
+async function vEventDetail(id) {
+  const e = await api('/events/' + id);
+  let raw = e.raw; try { raw = JSON.stringify(JSON.parse(e.raw), null, 2); } catch {}
+  $('#view').innerHTML = `<h1>Event #${e.id}</h1>
+    <section><div class="kv">
+      <div>time</div><div>${ts(e.ts)}</div>
+      <div>source</div><div>${esc(e.source)}</div>
+      <div>host</div><div>${esc(e.host || '-')}</div>
+      <div>user</div><div>${esc(e.user || '-')}</div>
+      <div>decision</div><div>${decBadge(e.decision)}</div>
+      <div>p(suspicious)</div><div>${num(e.is_suspicious)} (conf ${num(e.suspicious_confidence)})</div>
+      <div>severity</div><div>${num(e.severity, 1)} (conf ${num(e.severity_confidence)})</div>
+      <div>tactic</div><div>${esc(e.tactic || '-')} (conf ${num(e.tactic_confidence)})</div>
+      <div>p(needs_context)</div><div>${num(e.needs_context)}</div>
+      <div>backend</div><div>${esc(e.backend || '-')}</div>
+    </div>
+    <h2>raw</h2><pre>${esc(raw)}</pre></section>
+    <section><h2>Model calls (${(e.calls || []).length})</h2><table>
+      <tr><th>id</th><th>time</th><th>system</th><th>model</th><th>p(susp)</th><th>sev</th><th>tactic</th><th>ms</th><th>cost $</th></tr>
+      ${(e.calls || []).map(c => `<tr class="click" onclick="go('calls/${c.id}')">
+        <td>#${c.id}</td><td>${esc((c.ts_iso || '').slice(5, 19).replace('T', ' '))}</td><td>${esc(c.system)}</td>
+        <td>${esc(c.model || '-')}</td><td>${num(c.is_suspicious)}</td><td>${num(c.severity, 1)}</td>
+        <td>${esc(c.tactic || '-')}</td><td>${Math.round(c.latency_ms || 0)}</td><td>${(c.cost || 0).toFixed(6)}</td></tr>`).join('')
+        || '<tr><td class="muted">none</td></tr>'}</table></section>
+    <section><h2>Linked campaigns (${(e.campaigns || []).length})</h2><table>
+      <tr><th>id</th><th>anchor</th><th>status</th><th>tactics</th></tr>
+      ${(e.campaigns || []).map(c => `<tr class="click" onclick="go('campaigns/${c.id}')">
+        <td>#${c.id}</td><td>${esc(c.anchor)}</td><td>${badge(c.status, c.status)}</td>
+        <td>${(c.tactics || []).map(t => `<span class="chip">${esc(t)}</span>`).join(' ')}</td></tr>`).join('')
+        || '<tr><td class="muted">none</td></tr>'}</table></section>`;
+}
+
+async function vCampaigns() {
+  const rows = await api('/campaigns');
+  $('#view').innerHTML = `<h1>Campaigns</h1>
+    <section><table><tr><th>id</th><th>anchor</th><th>status</th><th>tactics</th><th>hosts</th><th>users</th><th>events</th></tr>
+    ${rows.map(c => `<tr class="click" onclick="go('campaigns/${c.id}')">
+      <td>#${c.id}</td><td>${esc(c.anchor)}</td><td>${badge(c.status, c.status)}</td>
+      <td>${(c.tactics || []).map(t => `<span class="chip">${esc(t)}</span>`).join(' ')}</td>
+      <td>${esc((c.hosts || []).join(', '))}</td><td>${esc((c.users || []).join(', '))}</td>
+      <td>${(c.event_ids || []).length}</td></tr>`).join('')}</table></section>`;
+}
+
+const TACTIC_STYLE = {
+  'recon':                ['#60a5fa', '◎'],
+  'initial-access':       ['#fbbf24', '◈'],
+  'execution':            ['#fb923c', '▶'],
+  'persistence':          ['#a78bfa', '⚓'],
+  'privilege-escalation': ['#f472b6', '⇑'],
+  'defense-evasion':      ['#94a3b8', '◐'],
+  'credential-access':    ['#f87171', '⚿'],
+  'lateral-movement':     ['#34d399', '⇄'],
+  'exfiltration':         ['#c084fc', '⇪'],
+  'benign':               ['#7d8fa6', '·'],
+};
+
+// group consecutive same-tactic events into chronological kill-chain steps
+function chainSteps(events) {
+  const asc = [...events].sort((a, b) => a.ts - b.ts);
+  const steps = [];
+  for (const e of asc) {
+    const t = e.tactic || 'benign';
+    const last = steps[steps.length - 1];
+    if (last && last.tactic === t) { last.count++; last.lastTs = e.ts; }
+    else steps.push({ tactic: t, count: 1, firstTs: e.ts, lastTs: e.ts, firstId: e.id, host: e.host });
+  }
+  return steps;
+}
+
+function chainSvg(events) {
+  const steps = chainSteps(events);
+  if (!steps.length) return '<span class="muted">no events</span>';
+  const W = Math.max(640, steps.length * 200 + 20), H = 150, NW = 170, NH = 72, y = 42;
+  const hm = v => new Date(v * 1000).toISOString().slice(11, 16);
+  let nodes = '', edges = '';
+  steps.forEach((s, i) => {
+    const x = 14 + i * 200, [color, glyph] = TACTIC_STYLE[s.tactic] || TACTIC_STYLE.benign;
+    if (i > 0) edges += `<line x1="${x - 30}" y1="${y + NH / 2}" x2="${x - 6}" y2="${y + NH / 2}" stroke="#3b4d63" stroke-width="1.5" marker-end="url(#arr)"/>`;
+    nodes += `<g onclick="go('events/${s.firstId}')" style="cursor:pointer">
+      <rect x="${x}" y="${y}" width="${NW}" height="${NH}" rx="9" fill="#0e1520" stroke="${color}" stroke-width="1.6"/>
+      <circle cx="${x + 18}" cy="${y + 20}" r="9" fill="${color}" opacity="0.18"/>
+      <text x="${x + 18}" y="${y + 24}" text-anchor="middle" font-size="11" fill="${color}">${glyph}</text>
+      <text x="${x + 34}" y="${y + 24}" font-size="12" font-weight="700" fill="${color}">${esc(s.tactic)}</text>
+      <text x="${x + 12}" y="${y + 44}" font-size="10.5" fill="#d7e1ec">×${s.count} event${s.count > 1 ? 's' : ''}</text>
+      <text x="${x + 12}" y="${y + 60}" font-size="10" fill="#7d8fa6">${hm(s.firstTs)}–${hm(s.lastTs)} UTC${s.host ? ' · ' + esc(String(s.host).slice(0, 18)) : ''}</text>
+      <title>${esc(s.tactic)} · ${s.count} events · click for first event</title>
+    </g>`;
+  });
+  return `<div style="overflow-x:auto"><svg width="${W}" height="${H}" style="display:block">
+    <defs><marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#3b4d63"/></marker></defs>
+    ${edges}${nodes}</svg></div>`;
+}
+
+async function vCampaignDetail(id) {
+  const c = await api('/campaigns/' + id);
+  $('#view').innerHTML = `<h1>Campaign #${c.id} — ${esc(c.anchor)}</h1>
+    <section><div class="kv">
+      <div>status</div><div>${badge(c.status, c.status)}</div>
+      <div>tactics</div><div>${(c.tactics || []).map(t => `<span class="chip">${esc(t)}</span>`).join(' ')}</div>
+      <div>hosts</div><div>${esc((c.hosts || []).join(', '))}</div>
+      <div>users</div><div>${esc((c.users || []).join(', '))}</div>
+      <div>updated</div><div>${ts(c.updated_at)}</div>
+    </div>
+    ${c.narrative ? `<h2>narrative</h2><div class="nar">${esc(c.narrative)}</div>` : ''}</section>
+    <section><h2>Attack chain — chronological steps</h2>${chainSvg(c.events || [])}
+      <p class="muted">consecutive same-tactic events grouped into steps · click a step for its first event</p></section>
+    <section><h2>Response actions</h2><table>
+      <tr><th>id</th><th>action</th><th>risk</th><th>p(disruptive)</th><th>status</th><th></th></tr>
+      ${(c.approvals || []).map(a => approvalRow(a)).join('') || '<tr><td class="muted">none</td></tr>'}</table></section>
+    <section><h2>Linked events (${(c.event_ids || []).length})</h2><table>
+      <tr><th>id</th><th>time</th><th>source</th><th>host</th><th>user</th><th>p(susp)</th><th>tactic</th><th>decision</th></tr>
+      ${(c.events || []).map(e => `<tr class="click" onclick="go('events/${e.id}')">
+        <td>#${e.id}</td><td>${ts(e.ts)}</td><td>${esc(e.source)}</td><td>${esc(e.host || '-')}</td><td>${esc(e.user || '-')}</td>
+        <td>${num(e.is_suspicious)}</td><td>${esc(e.tactic || '-')}</td><td>${decBadge(e.decision)}</td></tr>`).join('')}</table></section>`;
+}
+
+function approvalRow(a) {
+  const acts = a.status === 'pending'
+    ? `<button class="ok" onclick="decide(${a.id},'approve')">approve</button>
+       <button class="no" onclick="decide(${a.id},'reject')">reject</button>` : '';
+  return `<tr><td>#${a.id}</td><td style="white-space:normal">${esc(a.action)}</td>
+    <td>${esc(a.risk || '-')}</td><td>${num(a.disruptive_prob)}</td>
+    <td>${badge(a.status, a.status)}</td><td>${acts}</td></tr>`;
+}
+
+async function vApprovals() {
+  const rows = await api('/approvals?status=pending');
+  $('#view').innerHTML = `<h1>Approvals — pending (${rows.length})</h1>
+    <section><table><tr><th>id</th><th>campaign</th><th>action</th><th>risk</th><th>p(disruptive)</th><th>status</th><th></th></tr>
+    ${rows.map(a => `<tr><td>#${a.id}</td><td><a href="#/campaigns/${a.campaign_id}">#${a.campaign_id}</a></td>
+      <td style="white-space:normal">${esc(a.action)}</td><td>${esc(a.risk || '-')}</td>
+      <td>${num(a.disruptive_prob)}</td><td>${badge(a.status, a.status)}</td>
+      <td><button class="ok" onclick="decide(${a.id},'approve')">approve</button>
+          <button class="no" onclick="decide(${a.id},'reject')">reject</button></td></tr>`).join('')}</table></section>`;
+}
+
+async function decide(id, decision) {
+  await fetch(`/api/approvals/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision }) });
+  render();
+}
+
+async function vCalls(r) {
+  const page = +(r.q.get('page') || 0), size = 50;
+  const system = r.q.get('system') || 'system1';
+  const d = await api(`/model-calls?system=${system}&limit=${size}&offset=${page * size}`);
+  const base = `calls?system=${system}&`;
+  $('#view').innerHTML = `<h1>Model calls</h1>
+    <section><div class="toolbar"><select id="sys">
+      ${['system1', 'system2', 'guardrail'].map(o => `<option ${o === system ? 'selected' : ''}>${o}</option>`).join('')}
+    </select></div>
+    <table><tr><th>id</th><th>time</th><th>model</th><th>event</th><th>campaign</th><th>p(susp)</th><th>sev</th><th>tactic</th><th>ms</th><th>cost $</th></tr>
+    ${d.rows.map(c => `<tr class="click" onclick="go('calls/${c.id}')">
+      <td>#${c.id}</td><td>${esc((c.ts_iso || '').slice(5, 19).replace('T', ' '))}</td><td>${esc(c.model || '-')}</td>
+      <td>${c.event_id ? `<a href="#/events/${c.event_id}">#${c.event_id}</a>` : '-'}</td>
+      <td>${c.campaign_id ? `<a href="#/campaigns/${c.campaign_id}">#${c.campaign_id}</a>` : '-'}</td>
+      <td>${num(c.is_suspicious)}</td><td>${num(c.severity, 1)}</td><td>${esc(c.tactic || '-')}</td>
+      <td>${Math.round(c.latency_ms || 0)}</td><td>${(c.cost || 0).toFixed(6)}</td></tr>`).join('')}</table>
+    ${pager(d.total, page, size, base)}</section>`;
+  $('#sys').onchange = e => go(`calls?system=${e.target.value}&page=0`);
+}
+
+const pretty = v => { if (typeof v === 'string') { try { v = JSON.parse(v); } catch {} } return esc(JSON.stringify(v, null, 2)); };
+
+async function vCallDetail(id) {
+  const c = await api('/model-calls/' + id);
+  $('#view').innerHTML = `<h1>Model call #${c.id}</h1>
+    <section><div class="kv">
+      <div>system</div><div>${esc(c.system)}</div>
+      <div>backend</div><div>${esc(c.backend || '-')}</div>
+      <div>model</div><div>${esc(c.model || '-')}</div>
+      <div>latency</div><div>${Math.round(c.latency_ms || 0)} ms</div>
+      <div>cost</div><div>$${(c.cost || 0).toFixed(6)}</div>
+      <div>event</div><div>${c.event_id ? `<a href="#/events/${c.event_id}">#${c.event_id}</a>` : '-'}</div>
+      <div>campaign</div><div>${c.campaign_id ? `<a href="#/campaigns/${c.campaign_id}">#${c.campaign_id}</a>` : '-'}</div>
+    </div>
+    <details open><summary>response</summary><pre>${pretty(c.response)}</pre></details>
+    <details><summary>request</summary><pre>${pretty(c.request)}</pre></details>
+    </section>`;
+}
+
+const DASHBOARDS = [
+  ['jev-soc', 'JEV SOC Agent — overview'],
+  ['jev-soc-s1', 'System 1 Triage'],
+  ['jev-soc-s2', 'Campaigns & Response'],
+  ['jev-soc-logs', 'Logs'],
+];
+
+function vDashboards(r) {
+  const uid = r.q.get('d') || 'jev-soc';
+  $('#view').innerHTML = `<h1>Dashboards</h1>
+    <div class="toolbar">${DASHBOARDS.map(([u, name]) =>
+      `<button ${u === uid ? 'disabled' : ''} onclick="go('dashboards?d=${u}')">${esc(name)}</button>`).join('')}
+      <a href="http://localhost:3000/d/${uid}" target="_blank" style="margin-left:auto">open in grafana ↗</a></div>
+    <iframe src="http://localhost:3000/d/${uid}?kiosk&refresh=10s&theme=dark"
+      style="width:100%;height:calc(100vh - 130px);border:1px solid var(--line);border-radius:8px;background:var(--panel)"></iframe>`;
+}
+
+const VIEWS = { overview: vOverview, scorecard: vScorecard, events: vEvents, campaigns: vCampaigns, approvals: vApprovals, calls: vCalls, dashboards: vDashboards };
+
+async function render() {
+  const r = route();
+  document.querySelectorAll('nav a').forEach(a => a.classList.toggle('active', a.dataset.r === r.name));
+  try {
+    if (r.name === 'events' && r.id) return await vEventDetail(r.id);
+    if (r.name === 'campaigns' && r.id) return await vCampaignDetail(r.id);
+    if (r.name === 'calls' && r.id) return await vCallDetail(r.id);
+    await (VIEWS[r.name] || vOverview)(r);
+  } catch (e) {
+    $('#view').innerHTML = `<h1>${esc(r.name)}</h1><div class="err">api error: ${esc(e.message)}</div>`;
+  }
+}
+window.addEventListener('hashchange', render);
+render();
+setInterval(() => { if (route().name === 'overview') render(); }, 8000);
+</script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 {
-  "title": "SOC — System 1 Triage",
+  "title": "SOC \u2014 System 1 Triage",
   "uid": "jev-soc-s1",
   "refresh": "10s",
   "time": {
@@ -205,7 +205,7 @@
           "url": "http://host.docker.internal:8000/model-calls?system=system1&limit=100",
           "parser": "backend",
           "format": "table",
-          "root_selector": "",
+          "root_selector": "rows",
           "url_options": {
             "method": "GET",
             "data": "",

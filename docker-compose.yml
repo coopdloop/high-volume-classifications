@@ -27,6 +27,7 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_SECURITY_ALLOW_EMBEDDING=true
       - GF_INSTALL_PLUGINS=yesoreyeram-infinity-datasource
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -34,6 +35,16 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
       - loki
+
+  ui:
+    image: nginx:1.27-alpine
+    ports:
+      - "8080:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./ui:/usr/share/nginx/html:ro
+      - ./ui/nginx.conf:/etc/nginx/conf.d/default.conf:ro
 
   phoenix:
     image: arizephoenix/phoenix:latest
