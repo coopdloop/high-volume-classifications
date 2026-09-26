@@ -1,0 +1,269 @@
+{
+  "title": "SOC — Campaigns & Response",
+  "uid": "jev-soc-s2",
+  "refresh": "10s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "schemaVersion": 39,
+  "version": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "System 2 — campaigns",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 14,
+        "h": 9
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "socapi"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "type": "json",
+          "source": "url",
+          "url": "http://host.docker.internal:8000/campaigns",
+          "parser": "backend",
+          "format": "table",
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "id",
+              "text": "id",
+              "type": "number"
+            },
+            {
+              "selector": "anchor",
+              "text": "anchor",
+              "type": "string"
+            },
+            {
+              "selector": "tactics",
+              "text": "tactics",
+              "type": "string"
+            },
+            {
+              "selector": "hosts",
+              "text": "hosts",
+              "type": "string"
+            },
+            {
+              "selector": "users",
+              "text": "users",
+              "type": "string"
+            },
+            {
+              "selector": "status",
+              "text": "status",
+              "type": "string"
+            },
+            {
+              "selector": "narrative",
+              "text": "narrative",
+              "type": "string"
+            }
+          ],
+          "url_options": {
+            "method": "GET",
+            "data": "",
+            "params": [],
+            "headers": []
+          }
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "SOAR approval queue (pending)",
+      "gridPos": {
+        "x": 14,
+        "y": 0,
+        "w": 10,
+        "h": 9
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "socapi"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "type": "json",
+          "source": "url",
+          "url": "http://host.docker.internal:8000/approvals?status=pending",
+          "parser": "backend",
+          "format": "table",
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "id",
+              "text": "id",
+              "type": "number"
+            },
+            {
+              "selector": "campaign_id",
+              "text": "campaign",
+              "type": "number"
+            },
+            {
+              "selector": "action",
+              "text": "action",
+              "type": "string"
+            },
+            {
+              "selector": "risk",
+              "text": "risk",
+              "type": "string"
+            },
+            {
+              "selector": "disruptive_prob",
+              "text": "p(disruptive)",
+              "type": "number"
+            }
+          ],
+          "url_options": {
+            "method": "GET",
+            "data": "",
+            "params": [],
+            "headers": []
+          }
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "System 2 — LLM calls (narrative / playbook)",
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "socapi"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "type": "json",
+          "source": "url",
+          "url": "http://host.docker.internal:8000/model-calls?system=system2&limit=50",
+          "parser": "backend",
+          "format": "table",
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "id",
+              "text": "call",
+              "type": "number"
+            },
+            {
+              "selector": "ts_iso",
+              "text": "time",
+              "type": "string"
+            },
+            {
+              "selector": "campaign_id",
+              "text": "campaign",
+              "type": "number"
+            },
+            {
+              "selector": "model",
+              "text": "model",
+              "type": "string"
+            },
+            {
+              "selector": "latency_ms",
+              "text": "ms",
+              "type": "number"
+            },
+            {
+              "selector": "cost",
+              "text": "cost $",
+              "type": "number"
+            }
+          ],
+          "url_options": {
+            "method": "GET",
+            "data": "",
+            "params": [],
+            "headers": []
+          }
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Guardrail calls (JEV Noul per action)",
+      "gridPos": {
+        "x": 12,
+        "y": 9,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "socapi"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "type": "json",
+          "source": "url",
+          "url": "http://host.docker.internal:8000/model-calls?system=guardrail&limit=50",
+          "parser": "backend",
+          "format": "table",
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "id",
+              "text": "call",
+              "type": "number"
+            },
+            {
+              "selector": "ts_iso",
+              "text": "time",
+              "type": "string"
+            },
+            {
+              "selector": "campaign_id",
+              "text": "campaign",
+              "type": "number"
+            },
+            {
+              "selector": "disruptive_prob",
+              "text": "p(disruptive)",
+              "type": "number"
+            },
+            {
+              "selector": "latency_ms",
+              "text": "ms",
+              "type": "number"
+            },
+            {
+              "selector": "cost",
+              "text": "cost $",
+              "type": "number"
+            }
+          ],
+          "url_options": {
+            "method": "GET",
+            "data": "",
+            "params": [],
+            "headers": []
+          }
+        }
+      ]
+    }
+  ]
+}

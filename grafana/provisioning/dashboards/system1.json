@@ -1,0 +1,350 @@
+{
+  "title": "SOC — System 1 Triage",
+  "uid": "jev-soc-s1",
+  "refresh": "10s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "schemaVersion": 39,
+  "version": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Log volume by source",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 7
+      },
+      "datasource": {
+        "type": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (source) (count_over_time({job=\"soc\"}[$__interval]))",
+          "legendFormat": "{{source}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "Escalated events",
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "socapi"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "type": "json",
+          "source": "url",
+          "url": "http://host.docker.internal:8000/alerts?decision=escalate&limit=50",
+          "parser": "backend",
+          "format": "table",
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "id",
+              "text": "id",
+              "type": "number"
+            },
+            {
+              "selector": "source",
+              "text": "source",
+              "type": "string"
+            },
+            {
+              "selector": "host",
+              "text": "host",
+              "type": "string"
+            },
+            {
+              "selector": "user",
+              "text": "user",
+              "type": "string"
+            },
+            {
+              "selector": "is_suspicious",
+              "text": "p(suspicious)",
+              "type": "number"
+            },
+            {
+              "selector": "severity",
+              "text": "severity",
+              "type": "number"
+            },
+            {
+              "selector": "tactic",
+              "text": "MITRE tactic",
+              "type": "string"
+            },
+            {
+              "selector": "backend",
+              "text": "backend",
+              "type": "string"
+            }
+          ],
+          "url_options": {
+            "method": "GET",
+            "data": "",
+            "params": [],
+            "headers": []
+          }
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "Review queue (uncalibrated / uncertain)",
+      "gridPos": {
+        "x": 12,
+        "y": 7,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "socapi"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "type": "json",
+          "source": "url",
+          "url": "http://host.docker.internal:8000/alerts?decision=review&limit=50",
+          "parser": "backend",
+          "format": "table",
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "id",
+              "text": "id",
+              "type": "number"
+            },
+            {
+              "selector": "source",
+              "text": "source",
+              "type": "string"
+            },
+            {
+              "selector": "host",
+              "text": "host",
+              "type": "string"
+            },
+            {
+              "selector": "user",
+              "text": "user",
+              "type": "string"
+            },
+            {
+              "selector": "is_suspicious",
+              "text": "p(suspicious)",
+              "type": "number"
+            },
+            {
+              "selector": "severity",
+              "text": "severity",
+              "type": "number"
+            },
+            {
+              "selector": "tactic",
+              "text": "MITRE tactic",
+              "type": "string"
+            },
+            {
+              "selector": "backend",
+              "text": "backend",
+              "type": "string"
+            }
+          ],
+          "url_options": {
+            "method": "GET",
+            "data": "",
+            "params": [],
+            "headers": []
+          }
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "JEV decision log (probability maps)",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 24,
+        "h": 10
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "socapi"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "type": "json",
+          "source": "url",
+          "url": "http://host.docker.internal:8000/model-calls?system=system1&limit=100",
+          "parser": "backend",
+          "format": "table",
+          "root_selector": "",
+          "url_options": {
+            "method": "GET",
+            "data": "",
+            "params": [],
+            "headers": []
+          },
+          "columns": [
+            {
+              "selector": "id",
+              "text": "call",
+              "type": "number"
+            },
+            {
+              "selector": "ts_iso",
+              "text": "time",
+              "type": "string"
+            },
+            {
+              "selector": "event_id",
+              "text": "event",
+              "type": "number"
+            },
+            {
+              "selector": "model",
+              "text": "model",
+              "type": "string"
+            },
+            {
+              "selector": "is_suspicious",
+              "text": "p(susp)",
+              "type": "number"
+            },
+            {
+              "selector": "needs_context",
+              "text": "p(needs_ctx)",
+              "type": "number"
+            },
+            {
+              "selector": "severity",
+              "text": "sev",
+              "type": "number"
+            },
+            {
+              "selector": "tactic",
+              "text": "tactic",
+              "type": "string"
+            },
+            {
+              "selector": "tactic_probabilities",
+              "text": "tactic prob map",
+              "type": "string"
+            },
+            {
+              "selector": "latency_ms",
+              "text": "ms",
+              "type": "number"
+            },
+            {
+              "selector": "cost",
+              "text": "cost $",
+              "type": "number"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Benign (recent)",
+      "gridPos": {
+        "x": 0,
+        "y": 26,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "socapi"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "type": "json",
+          "source": "url",
+          "url": "http://host.docker.internal:8000/alerts?decision=benign&limit=25",
+          "parser": "backend",
+          "format": "table",
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "id",
+              "text": "id",
+              "type": "number"
+            },
+            {
+              "selector": "source",
+              "text": "source",
+              "type": "string"
+            },
+            {
+              "selector": "host",
+              "text": "host",
+              "type": "string"
+            },
+            {
+              "selector": "user",
+              "text": "user",
+              "type": "string"
+            },
+            {
+              "selector": "is_suspicious",
+              "text": "p(suspicious)",
+              "type": "number"
+            },
+            {
+              "selector": "severity",
+              "text": "severity",
+              "type": "number"
+            },
+            {
+              "selector": "tactic",
+              "text": "MITRE tactic",
+              "type": "string"
+            },
+            {
+              "selector": "backend",
+              "text": "backend",
+              "type": "string"
+            }
+          ],
+          "url_options": {
+            "method": "GET",
+            "data": "",
+            "params": [],
+            "headers": []
+          }
+        }
+      ]
+    }
+  ]
+}

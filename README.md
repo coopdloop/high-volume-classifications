@@ -7,7 +7,7 @@ escalated, and handles correlation, narratives, and response playbooks.
 
 Why: LLM classification is slow, expensive per decision, and its "confidence"
 isn't a real probability. JEV's is — so routing thresholds actually mean
-something. Full writeup: **[docs/blog-post.md](docs/blog-post.md)**.
+something. New here? Start with **[docs/getting-started.md](docs/getting-started.md)**.
 
 ## How it works
 
@@ -45,6 +45,6 @@ Phoenix traces · `curl localhost:8000/approvals?status=pending`
 | `soc/jev_client.py` | backends: JEV via OpenRouter (default), TypeSafe direct, LLM-emulated |
 | `config/` | question-adjacent policy: thresholds, asset inventory |
 | `generator/` | synthetic attack campaign + BOTS v3 converter |
-| `diagrams/`, `docs/` | mermaid diagrams, technical writeup |
+| `diagrams/`, `docs/` | mermaid diagrams, getting-started guide |
 
 Lint mermaid before pushing: `make lint` (covers README too)

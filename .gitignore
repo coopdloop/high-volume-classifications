@@ -5,3 +5,7 @@ data/
 __pycache__/
 .venv/
 *.pyc
+
+# draft writeup (local only)
+blog-post.md
+datasets/
