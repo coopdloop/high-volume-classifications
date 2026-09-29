@@ -73,9 +73,10 @@ class TypeSafeBackend:
             tracing.finish(span, out.raw, metadata={"backend": self.name})
         return out
 
-    def noul(self, state: str, instructions: str) -> float:
+    def noul(self, state: str, instructions: str) -> tuple[float, dict]:
         resp = self.client.system_one(state=state, questions={"gate": self._Noul(instructions=instructions)})
-        return float(resp.answers["gate"].noul)
+        prob = float(resp.answers["gate"].noul)
+        return prob, {"model": self.model, "cost": None, "raw": {"gate": prob}}
 
 
 class JevOpenRouterBackend:
@@ -134,9 +135,13 @@ class JevOpenRouterBackend:
                 }
         return out
 
-    def noul(self, state: str, instructions: str) -> float:
-        answers = self._decide(state, {"gate": {"type": "noul", "instructions": instructions}})["answers"]
-        return float(answers["gate"]["noul"])
+    def noul(self, state: str, instructions: str) -> tuple[float, dict]:
+        data = self._decide(state, {"gate": {"type": "noul", "instructions": instructions}})
+        return float(data["answers"]["gate"]["noul"]), {
+            "model": data.get("model", self.model),
+            "cost": (data.get("usage") or {}).get("cost"),
+            "raw": data["answers"],
+        }
 
 
 class OpenRouterBackend:
@@ -200,6 +205,18 @@ class OpenRouterBackend:
         out.scores = parsed.get("scores", {})
         return out
 
+    def noul(self, state: str, instructions: str) -> tuple[float, dict]:
+        data = self._chat([
+            {"role": "system", "content": "You emulate a System-1 calibrated classifier. Output strict JSON only."},
+            {"role": "user", "content": (
+                f"STATE:\n{state}\n\nQuestion (answer with calibrated probability that the statement is true):\n"
+                f"{instructions}\n\nReturn ONLY JSON: {{\"noul\": <probability 0-1>}}"
+            )},
+        ])
+        prob = float(self._parse(data["choices"][0]["message"]["content"])["noul"])
+        return prob, {"model": self.model, "cost": (data.get("usage") or {}).get("cost"),
+                      "raw": {"gate": prob}}
+
 
 def get_classifier():
     """Backend selection: SYSTEM1_BACKEND=auto|typesafe|jev-openrouter|emulated.
@@ -231,27 +248,7 @@ def noul_gate(classifier, state: str, instructions: str, record: dict | None = N
     t0 = time.time()
     with tracing.llm_call("jev.noul_gate", model=getattr(classifier, "model", "?"), provider="typesafe",
                           input_value={"state": state, "question": instructions}) as span:
-        if isinstance(classifier, TypeSafeBackend):
-            prob = classifier.noul(state, instructions)
-            meta = {"model": classifier.model, "cost": None, "raw": {"gate": prob}}
-        elif isinstance(classifier, JevOpenRouterBackend):
-            data = classifier._decide(state, {"gate": {"type": "noul", "instructions": instructions}})
-            prob = float(data["answers"]["gate"]["noul"])
-            meta = {
-                "model": data.get("model", classifier.model),
-                "cost": (data.get("usage") or {}).get("cost"),
-                "raw": data["answers"],
-            }
-        else:
-            data = classifier._chat([
-                {"role": "system", "content": "You emulate a System-1 calibrated classifier. Output strict JSON only."},
-                {"role": "user", "content": (
-                    f"STATE:\n{state}\n\nQuestion (answer with calibrated probability that the statement is true):\n"
-                    f"{instructions}\n\nReturn ONLY JSON: {{\"noul\": <probability 0-1>}}"
-                )},
-            ])
-            prob = float(classifier._parse(data["choices"][0]["message"]["content"])["noul"])
-            meta = {"model": classifier.model, "cost": (data.get("usage") or {}).get("cost"), "raw": {"gate": prob}}
+        prob, meta = classifier.noul(state, instructions)
         tracing.finish(span, meta["raw"], cost=meta.get("cost"),
                        metadata={"backend": classifier.name, "guardrail": True})
     if record is not None:

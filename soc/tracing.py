@@ -15,6 +15,15 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 _initialized = False
 
+# OpenAI-style and Anthropic-style usage keys -> OpenInference token attributes
+TOKEN_ATTRS = {
+    "prompt_tokens": "llm.token_count.prompt",
+    "input_tokens": "llm.token_count.prompt",
+    "completion_tokens": "llm.token_count.completion",
+    "output_tokens": "llm.token_count.completion",
+    "total_tokens": "llm.token_count.total",
+}
+
 
 def init(service: str = "jev-soc-agent"):
     global _initialized
@@ -57,11 +66,7 @@ def finish(span, output_value, *, usage: dict | None = None, cost: float | None 
     span.set_attribute("output.value", _j(output_value))
     span.set_attribute("output.mime_type", "application/json")
     if usage:
-        for src, dst in (("prompt_tokens", "llm.token_count.prompt"),
-                         ("completion_tokens", "llm.token_count.completion"),
-                         ("total_tokens", "llm.token_count.total"),
-                         ("input_tokens", "llm.token_count.prompt"),
-                         ("output_tokens", "llm.token_count.completion")):
+        for src, dst in TOKEN_ATTRS.items():
             if usage.get(src) is not None:
                 span.set_attribute(dst, usage[src])
     if cost is not None:

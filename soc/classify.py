@@ -27,20 +27,23 @@ def load_policy():
         return yaml.safe_load(f)
 
 
+def noul_confidence(p: float) -> float:
+    """A calibrated noul is most uncertain near 0.5; confidence scales with distance."""
+    return min(1.0, abs(p - 0.5) * 2)
+
+
 def decide(c, host_criticality, policy) -> str:
+    is_suspicious = c.nouls.get("is_suspicious", 0.0)
     ctx = {
-        "is_suspicious": c.nouls.get("is_suspicious", 0.0),
+        "is_suspicious": is_suspicious,
         "needs_context": c.nouls.get("needs_context", 0.0),
         "severity": c.scores.get("severity", {}).get("score", 1.0),
-        "suspicious_confidence": 1.0,  # noul questions: probability doubles as confidence
+        "suspicious_confidence": noul_confidence(is_suspicious),
         "severity_confidence": c.scores.get("severity", {}).get("confidence", 1.0),
         "tactic_confidence": c.choices.get("mitre_tactic", {}).get("confidence", 1.0),
         "tactic": c.choices.get("mitre_tactic", {}).get("choice", "benign"),
         "host_criticality": host_criticality or 1,
     }
-    # suspicious_confidence: distance from 0.5 (a calibrated noul is most
-    # uncertain near 0.5), unless the backend reports an explicit confidence.
-    ctx["suspicious_confidence"] = min(1.0, abs(ctx["is_suspicious"] - 0.5) * 2)
     for expr in policy.get("escalate", []):
         if eval(expr, {"__builtins__": {}}, ctx):
             return "escalate"
@@ -135,7 +138,7 @@ def main():
                 rec = {
                     **ev,
                     "is_suspicious": c.nouls.get("is_suspicious"),
-                    "suspicious_confidence": min(1.0, abs(c.nouls.get("is_suspicious", 0.5) - 0.5) * 2),
+                    "suspicious_confidence": noul_confidence(c.nouls.get("is_suspicious", 0.5)),
                     "severity": c.scores.get("severity", {}).get("score"),
                     "severity_confidence": c.scores.get("severity", {}).get("confidence"),
                     "tactic": c.choices.get("mitre_tactic", {}).get("choice"),
