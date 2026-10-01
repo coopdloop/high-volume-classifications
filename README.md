@@ -45,6 +45,7 @@ Phoenix traces · `curl localhost:8000/approvals?status=pending`
 | `soc/jev_client.py` | backends: JEV via OpenRouter (default), TypeSafe direct, LLM-emulated |
 | `config/` | question-adjacent policy: thresholds, asset inventory |
 | `generator/` | synthetic attack campaign + BOTS v3 converter |
+| `tests/` | offline smoke tests (`make test`): routing, store, guardrail |
 | `diagrams/`, `docs/` | mermaid diagrams, getting-started guide |
 
 Lint mermaid before pushing: `make lint` (covers README too)

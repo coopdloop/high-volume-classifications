@@ -1,7 +1,7 @@
 PY ?= $(shell [ -x .venv/bin/python3 ] && echo .venv/bin/python3 || echo python3)
 RUN_DIR := .run
 
-.PHONY: dev up down stop install attack attack-burst attack-botsv1 status logs lint clean
+.PHONY: dev up down stop install attack attack-burst attack-botsv1 status logs lint test clean
 
 install: ## python deps + .env scaffold
 	$(PY) -m pip install -r requirements.txt || uv pip install --python $(PY) -r requirements.txt
@@ -55,6 +55,9 @@ logs: ## tail daemon logs
 
 lint: ## validate mermaid diagrams
 	$(PY) scripts/lint_mermaid.py
+
+test: ## offline smoke tests
+	$(PY) -m pytest tests/ -q
 
 clean: stop ## wipe generated data + pid files
 	rm -rf data $(RUN_DIR)
