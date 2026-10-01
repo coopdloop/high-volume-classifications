@@ -1,7 +1,9 @@
 """Approval-queue API. Run: uvicorn soc.api:app --port 8000"""
 
 import json
+import os
 import time
+from contextlib import asynccontextmanager
 
 import yaml
 from fastapi import FastAPI, HTTPException
@@ -9,12 +11,14 @@ from pydantic import BaseModel
 
 from . import store
 
-app = FastAPI(title="jev-soc-agent")
 
-
-@app.on_event("startup")
-def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     store.init()
+    yield
+
+
+app = FastAPI(title="jev-soc-agent", lifespan=lifespan)
 
 
 @app.get("/health")
@@ -43,7 +47,7 @@ def stats():
 @app.get("/scorecard")
 def scorecard():
     try:
-        with open("config/ground_truth.yml") as f:
+        with open(os.getenv("GROUND_TRUTH", "config/ground_truth.yml")) as f:
             gt = yaml.safe_load(f)
     except FileNotFoundError:
         return []

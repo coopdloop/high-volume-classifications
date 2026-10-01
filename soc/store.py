@@ -38,6 +38,9 @@ CREATE TABLE IF NOT EXISTS approvals (
   status TEXT DEFAULT 'pending',   -- pending | approved | rejected | simulated-executed
   created_at REAL, decided_at REAL
 );
+-- hot paths: per-event escalation_count, correlate poll, event-detail calls
+CREATE INDEX IF NOT EXISTS idx_events_decision_ts ON events(decision, ts);
+CREATE INDEX IF NOT EXISTS idx_model_calls_event ON model_calls(event_id);
 """
 
 
