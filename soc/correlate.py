@@ -11,10 +11,9 @@ import re
 import time
 
 import httpx
-import yaml
 from dotenv import load_dotenv
 
-from . import agentlog, store, tracing
+from . import agentlog, policy, store, tracing
 from .jev_client import get_classifier, noul_gate
 
 load_dotenv()
@@ -58,11 +57,6 @@ GUARDRAIL_QUESTION = (
     "Executing this containment action could disrupt legitimate business "
     "operations or cause data loss if the detection were a false positive."
 )
-
-
-def load_policy():
-    with open(os.getenv("THRESHOLDS", "config/thresholds.yml")) as f:
-        return yaml.safe_load(f)
 
 
 def get_cursor() -> int:
@@ -264,17 +258,17 @@ def stitch_campaigns():
 def main():
     store.init()
     tracing.init()
-    policy = load_policy()
-    window_sec = int(policy.get("window_minutes", 20)) * 60
     classifier = get_classifier()
     cursor = get_cursor()
-    print(f"[correlate] window={window_sec}s interval={INTERVAL}s review_interval={REVIEW_INTERVAL}s")
+    print(f"[correlate] interval={INTERVAL}s review_interval={REVIEW_INTERVAL}s")
     last_review = time.time()
     while True:
+        pol = policy.load()  # hot-reloads when thresholds.yml changes
+        window_sec = int(pol.get("window_minutes", 20)) * 60
         events = store.escalations_since(cursor, window_sec)
         if events:
             cursor = max(e["id"] for e in events)
-            for anchor, evs in cluster(events, policy).items():
+            for anchor, evs in cluster(events, pol).items():
                 try:
                     process_campaign(anchor, evs, classifier)
                 except Exception as e:
@@ -283,7 +277,7 @@ def main():
             stitch_campaigns()
         if time.time() - last_review >= REVIEW_INTERVAL:
             last_review = time.time()
-            review_batch(policy, classifier)
+            review_batch(pol, classifier)
         time.sleep(INTERVAL)
 
 

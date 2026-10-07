@@ -34,7 +34,8 @@ make logs      # follow daemon output   ·   make stop / make down / make clean
 ```
 
 Watch: classify stdout · Grafana Explore `{job="soc"}` / `{job="soc-agent"}` ·
-Phoenix traces · `curl localhost:8000/approvals?status=pending`
+Phoenix traces · `curl localhost:8000/approvals?status=pending` ·
+`curl localhost:8000/calibration` (is System 1's confidence actually calibrated?)
 
 ## Layout
 

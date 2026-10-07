@@ -61,6 +61,60 @@ def scorecard():
     return out
 
 
+def _calibration_bins(pairs: list[tuple[float, int]], n_bins: int = 10) -> dict:
+    """Reliability bins + Brier score for (predicted_prob, outcome) pairs."""
+    n = len(pairs)
+    brier = sum((p - y) ** 2 for p, y in pairs) / n
+    base = sum(y for _, y in pairs) / n
+    baseline = sum((base - y) ** 2 for _, y in pairs) / n  # always predicting base rate
+    buckets: list[list[tuple[float, int]]] = [[] for _ in range(n_bins)]
+    for p, y in pairs:
+        buckets[min(int(p * n_bins), n_bins - 1)].append((p, y))
+    out = [
+        {
+            "range": f"{i / n_bins:.1f}-{(i + 1) / n_bins:.1f}",
+            "n": len(b),
+            "mean_predicted": round(sum(p for p, _ in b) / len(b), 4),
+            "observed_frequency": round(sum(y for _, y in b) / len(b), 4),
+        }
+        for i, b in enumerate(buckets) if b
+    ]
+    return {
+        "events": n,
+        "positives": sum(y for _, y in pairs),
+        "base_rate": round(base, 4),
+        "brier": round(brier, 4),
+        "brier_baseline": round(baseline, 4),
+        "skill": round(1 - brier / baseline, 4) if baseline > 0 else None,
+        "bins": out,
+    }
+
+
+@app.get("/calibration")
+def calibration(bins: int = 10):
+    """Is System 1's is_suspicious actually calibrated? Reliability bins + Brier
+    score against ground-truth labels (attack = raw matches a signal pattern)."""
+    try:
+        with open(os.getenv("GROUND_TRUTH", "config/ground_truth.yml")) as f:
+            gt = yaml.safe_load(f)
+    except FileNotFoundError:
+        raise HTTPException(404, "no ground truth file (set GROUND_TRUTH)")
+    patterns = [s["pattern"] for s in gt.get("signals", []) if s.get("in_telemetry", True)]
+    if not patterns:
+        raise HTTPException(404, "no in-telemetry ground-truth signals")
+    label = "CASE WHEN " + " OR ".join(["raw LIKE ?"] * len(patterns)) + " THEN 1 ELSE 0 END"
+    rows = store.query(
+        f"SELECT is_suspicious, {label} AS attack FROM events WHERE is_suspicious IS NOT NULL",
+        tuple(f"%{p}%" for p in patterns),
+    )
+    if not rows:
+        return {"events": 0, "bins": []}
+    pairs = [(min(1.0, max(0.0, float(r["is_suspicious"]))), int(r["attack"])) for r in rows]
+    result = _calibration_bins(pairs, max(2, min(bins, 50)))
+    result["label"] = "attack=1 if raw matches any in-telemetry ground-truth signal pattern"
+    return result
+
+
 @app.get("/alerts")
 def alerts(decision: str = "escalate", limit: int = 100):
     return store.query(

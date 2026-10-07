@@ -4,6 +4,7 @@ No Loki/OpenRouter/Phoenix needed — store tests use a tmp SQLite DB and
 noul_gate is exercised with a stub classifier.
 """
 
+import os
 import time
 
 import pytest
@@ -100,6 +101,34 @@ def test_question_set_shape():
     assert qs["is_suspicious"]["type"] == "noul"
     assert "benign" in qs["mitre_tactic"]["criteria"]
     assert len(qs["severity"]["criteria"]) == 5
+
+
+def test_calibration_bins():
+    from soc.api import _calibration_bins
+    pairs = [(0.0, 0), (1.0, 1), (0.5, 1), (0.5, 0)]
+    r = _calibration_bins(pairs, 2)
+    assert r["events"] == 4
+    assert r["positives"] == 2
+    assert r["brier"] == pytest.approx((0 + 0 + 0.25 + 0.25) / 4)
+    assert r["base_rate"] == 0.5
+    assert r["skill"] == pytest.approx(1 - 0.125 / 0.25)
+    assert [b["n"] for b in r["bins"]] == [1, 3]
+
+
+def test_policy_hot_reload(tmp_path, monkeypatch):
+    from soc import policy
+    monkeypatch.setattr(policy, "_cache", None)
+    f = tmp_path / "thresholds.yml"
+    f.write_text("window_minutes: 20\n")
+    monkeypatch.setenv("THRESHOLDS", str(f))
+    assert policy.load()["window_minutes"] == 20
+    os.utime(f, (time.time() + 5, time.time() + 5))  # same content, new mtime
+    assert policy.load()["window_minutes"] == 20
+    f.write_text("window_minutes: 99\n")
+    os.utime(f, (time.time() + 10, time.time() + 10))
+    assert policy.load()["window_minutes"] == 99
+    f.unlink()  # deleted file keeps last good policy
+    assert policy.load()["window_minutes"] == 99
 
 
 def test_get_classifier_requires_key(monkeypatch):

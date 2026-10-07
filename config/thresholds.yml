@@ -1,4 +1,5 @@
 # System-1 routing policy. Evaluated in order; first match wins.
+# Hot-reloaded by both daemons — edit and save, no restart needed.
 # Available vars: is_suspicious, needs_context, severity, suspicious_confidence,
 #                 severity_confidence, tactic_confidence, tactic, host_criticality
 escalate:

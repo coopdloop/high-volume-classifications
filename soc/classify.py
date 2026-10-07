@@ -9,10 +9,9 @@ import time
 from datetime import datetime, timezone
 
 import httpx
-import yaml
 from dotenv import load_dotenv
 
-from . import agentlog, enrich, store, tracing
+from . import agentlog, enrich, policy, store, tracing
 from .jev_client import get_classifier
 from .questions import question_set
 
@@ -20,11 +19,6 @@ load_dotenv()
 LOKI = os.getenv("LOKI_URL", "http://localhost:3100")
 POLL = float(os.getenv("POLL_INTERVAL", "5"))
 CURSOR_FILE = "data/loki_cursor"
-
-
-def load_policy():
-    with open(os.getenv("THRESHOLDS", "config/thresholds.yml")) as f:
-        return yaml.safe_load(f)
 
 
 def noul_confidence(p: float) -> float:
@@ -99,13 +93,13 @@ def fetch_logs(since_ns: int) -> tuple[list[tuple[int, dict]], int]:
 def main():
     store.init()
     tracing.init()
-    policy = load_policy()
-    window_sec = int(policy.get("window_minutes", 20)) * 60
     assets = enrich.load_assets()
     classifier = get_classifier()
     cursor = get_cursor()
     print(f"[classify] backend={classifier.name} polling {LOKI} every {POLL}s")
     while True:
+        pol = policy.load()  # hot-reloads when thresholds.yml changes
+        window_sec = int(pol.get("window_minutes", 20)) * 60
         try:
             events, end_ns = fetch_logs(cursor)
         except Exception as e:
@@ -134,7 +128,7 @@ def main():
                     print(f"[classify] classifier error: {e}")
                     continue
                 host_info = (assets.get("hosts") or {}).get(ev.get("host"), {})
-                decision = decide(c, host_info.get("criticality"), policy)
+                decision = decide(c, host_info.get("criticality"), pol)
                 rec = {
                     **ev,
                     "is_suspicious": c.nouls.get("is_suspicious"),
